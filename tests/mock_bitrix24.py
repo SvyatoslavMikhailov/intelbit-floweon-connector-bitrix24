@@ -110,9 +110,63 @@ def _seed() -> dict[str, Any]:
     }
 
 
-def create_app(limit_methods: frozenset[str] = frozenset()) -> FastAPI:
-    app = FastAPI(title="Bitrix24 Mock", version="0.1.0")
+def _seed_extended() -> dict[str, Any]:
+    """Сид e2e пресета b24-sap: компании с адресами и реквизитами, пустой каталог."""
     db = _seed()
+
+    def company(cid: int, title: str, city: str, postal: str, street: str) -> dict[str, Any]:
+        return {
+            "ID": str(cid),
+            "TITLE": title,
+            "CURRENCY_ID": "RUB",
+            "ADDRESS": street,
+            "ADDRESS_CITY": city,
+            "ADDRESS_POSTAL_CODE": postal,
+            "ADDRESS_COUNTRY": "RU",
+        }
+
+    def requisite(rid: int, cid: int, inn: str, kpp: str, name: str) -> dict[str, Any]:
+        return {
+            "ID": str(rid),
+            "ENTITY_ID": str(cid),
+            "ENTITY_TYPE_ID": "4",
+            "RQ_INN": inn,
+            "RQ_KPP": kpp,
+            "RQ_COMPANY_NAME": name,
+        }
+
+    db["companies"] = {
+        1: company(1, "ООО Ромашка", "Москва", "101000", "ул. Тверская, 1"),
+        2: company(2, "ООО Лютик", "Санкт-Петербург", "190000", "Невский пр., 2"),
+        3: company(3, "ЗАО Пион", "Казань", "420000", "ул. Баумана, 3"),
+        4: company(4, "ООО Сбой", "Тула", "300000", "ул. Ленина, 4"),
+    }
+    db["requisites"] = [
+        requisite(11, 1, "7701234567", "770101001", "ООО Ромашка"),
+        requisite(12, 2, "7702000002", "770201001", "ООО Лютик"),
+        requisite(14, 4, "0000000000", "000001001", "ООО Сбой"),
+    ]
+    # Каталог создаёт синхронизация пресета; склад остатков 201 есть.
+    db["products"] = {}
+    db["prices"] = {}
+    db["storeproducts"] = {}
+    return db
+
+
+def _match(items: Iterable[dict[str, Any]], filter_: Any) -> list[dict[str, Any]]:
+    """Точное совпадение по ключам filter (сравнение строкой: form передаёт строки)."""
+    if not isinstance(filter_, dict) or not filter_:
+        return list(items)
+    return [
+        item
+        for item in items
+        if all(str(item.get(key)) == str(value) for key, value in filter_.items())
+    ]
+
+
+def create_app(limit_methods: frozenset[str] = frozenset(), extended: bool = False) -> FastAPI:
+    app = FastAPI(title="Bitrix24 Mock", version="0.1.0")
+    db = _seed_extended() if extended else _seed()
     limit_seen: dict[str, int] = {}
 
     def _next_id(store: dict[int, Any]) -> int:
@@ -155,7 +209,7 @@ def create_app(limit_methods: frozenset[str] = frozenset()) -> FastAPI:
 
         # --- каталог: товары ------------------------------------------------ #
         if method == "catalog.product.list":
-            items = list(db["products"].values())
+            items = _match(db["products"].values(), params.get("filter"))
             page, nxt = _paginate(items, start)
             return _wrapped({"products": page}, len(items), nxt)
         if method == "catalog.product.get":
@@ -171,7 +225,7 @@ def create_app(limit_methods: frozenset[str] = frozenset()) -> FastAPI:
 
         # --- каталог: цены -------------------------------------------------- #
         if method == "catalog.price.list":
-            items = list(db["prices"].values())
+            items = _match(db["prices"].values(), params.get("filter"))
             page, nxt = _paginate(items, start)
             return _wrapped({"prices": page}, len(items), nxt)
         if method == "catalog.price.add":
@@ -193,7 +247,7 @@ def create_app(limit_methods: frozenset[str] = frozenset()) -> FastAPI:
         if method == "catalog.store.get":
             return {"result": {"store": db["stores"].get(int(params["id"]), {})}}
         if method == "catalog.storeproduct.list":
-            items = list(db["storeproducts"].values())
+            items = _match(db["storeproducts"].values(), params.get("filter"))
             page, nxt = _paginate(items, start)
             return _wrapped({"storeProducts": page}, len(items), nxt)
         if method == "catalog.storeproduct.get":
@@ -232,6 +286,16 @@ def create_app(limit_methods: frozenset[str] = frozenset()) -> FastAPI:
             return {"result": True}
 
         raise _MethodError(method)
+
+    @app.get("/_state")
+    async def state() -> JSONResponse:
+        """Состояние мока для проверок e2e (мок живёт в отдельном процессе)."""
+        return JSONResponse(
+            {
+                name: list(store.values()) if isinstance(store, dict) else store
+                for name, store in db.items()
+            }
+        )
 
     @app.post("/rest/{user_id}/{token}/{method}")
     async def handle(user_id: str, token: str, method: str, request: Request) -> JSONResponse:

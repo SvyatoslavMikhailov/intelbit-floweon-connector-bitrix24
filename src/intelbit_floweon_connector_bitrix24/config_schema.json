@@ -19,6 +19,11 @@
       "type": "integer",
       "description": "ID типа цены (catalog.priceType) для чтения/записи цен"
     },
+    "store_id": {
+      "type": ["integer", "string"],
+      "pattern": "^[0-9]+$",
+      "description": "ID склада (catalog.store) для upsert остатков store_product по code товара"
+    },
     "rate_limit_rps": {
       "type": "number",
       "default": 2,

@@ -23,6 +23,8 @@ from intelbit_floweon_connector_bitrix24.domains.deals import DealsDomain
 from intelbit_floweon_connector_bitrix24.domains.stock import StockDomain
 from intelbit_floweon_connector_bitrix24.webhooks import Bitrix24WebhookReceiver
 
+_UPSERT_ENTITIES = frozenset({"product", "price", "store_product"})
+
 _MANIFEST = PluginManifest(
     id="intelbit.floweon.connector.bitrix24",
     version="0.2.0",
@@ -121,7 +123,15 @@ class Bitrix24Connector(ConnectorPlugin):
         raise ValueError(f"Неизвестная сущность для read: {entity!r}")
 
     async def write(self, entity: str, data: dict[str, Any]) -> dict[str, Any]:
-        """Записать сущность. `data.op` ∈ {add, update, delete}; поля — в `data.fields`."""
+        """Записать сущность.
+
+        Два контракта:
+        - `data.op` ∈ {add, update, delete}, поля — в `data.fields` (прежний);
+        - канонический запись маппинга пресета (без ключа `fields`) для `product`,
+          `price`, `store_product` — upsert по `code` товара.
+        """
+        if "fields" not in data and entity in _UPSERT_ENTITIES:
+            return await self._upsert(entity, data)
         op = data.get("op", "add")
         fields = data.get("fields", {})
         entity_id: Any = data.get("id")
@@ -157,6 +167,58 @@ class Bitrix24Connector(ConnectorPlugin):
     async def subscribe(self, headers: dict[str, str], body: bytes) -> dict[str, Any]:
         """Приём исходящего вебхука коробки → канонический Event с idempotency-key."""
         return self.webhooks.parse_event(body)
+
+    # --- upsert по code (пресет b24-sap, 4-17-25) ------------------------- #
+
+    async def _upsert(self, entity: str, data: dict[str, Any]) -> dict[str, Any]:
+        # Служебные ключи ядра (_mode, _idempotency_key) и пустые значения не пишем.
+        record = {k: v for k, v in data.items() if not k.startswith("_") and v is not None}
+        code = record.get("code")
+        if code in (None, ""):
+            raise ValueError(f"upsert {entity}: поле code обязательно")
+        code = str(code)
+        if entity == "product":
+            existing = await self.catalog.list_records({"code": code})
+            if existing:
+                product_id = int(existing[0]["id"])
+                await self.catalog.update(product_id, record)
+                return {"id": product_id, "op": "update", "code": code}
+            return {"id": await self.catalog.add(record), "op": "add", "code": code}
+
+        product_id = await self._product_id_by_code(code)
+        if entity == "price":
+            fields = {"product_id": product_id}
+            fields.update({k: record[k] for k in ("price", "currency") if k in record})
+            prices = await self.catalog.list_prices(product_id)
+            if prices:
+                price_id = int(prices[0]["id"])
+                await self.catalog.update_price(price_id, fields)
+                return {"id": price_id, "op": "update", "code": code}
+            return {"id": await self.catalog.add_price(fields), "op": "add", "code": code}
+
+        # store_product
+        store_id = self.config.get("store_id")
+        if store_id is None or store_id == "":
+            raise ValueError(
+                "upsert store_product: в конфиге коннектора не задан store_id (склад остатков)"
+            )
+        store = int(store_id)
+        rows = await self.stock.list_stock(store, product_id)
+        amount = record.get("amount")
+        if rows:
+            row_id = int(rows[0]["id"])
+            await self.stock.update_stock(row_id, {"amount": amount})
+            return {"id": row_id, "op": "update", "code": code}
+        new_id = await self.stock.add_stock(
+            {"store_id": store, "product_id": product_id, "amount": amount}
+        )
+        return {"id": new_id, "op": "add", "code": code}
+
+    async def _product_id_by_code(self, code: str) -> int:
+        products = await self.catalog.list_records({"code": code})
+        if not products:
+            raise ValueError(f"товар с code {code!r} не найден в каталоге Bitrix24")
+        return int(products[0]["id"])
 
     # --- helpers ---------------------------------------------------------- #
 
