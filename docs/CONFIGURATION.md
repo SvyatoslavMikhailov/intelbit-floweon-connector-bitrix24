@@ -9,7 +9,7 @@
 | `price_type_id` | int | нет | ID типа цены (`catalog.priceType`) для чтения/записи цен |
 | `rate_limit_rps` | number | нет | Лимит запросов в секунду (по умолчанию 2) |
 | `timeout` | number | нет | Таймаут HTTP-запроса, сек (по умолчанию 30) |
-| `event_secret` | string | нет | `application_token` для проверки исходящих вебхуков |
+| `event_secret` | string | **да** | `application_token` для проверки исходящих вебхуков (без него — `ConfigurationError`) |
 
 ## Пример
 
@@ -31,5 +31,6 @@ event_secret: "outgoing-webhook-application-token"
 
 ## Авторизация исходящих вебхуков
 
-Коробка шлёт исходящие события с `auth[application_token]`. Если задан `event_secret`,
-коннектор сверяет токен и отклоняет события с несовпадающим значением.
+Коробка шлёт исходящие события с `auth[application_token]`. `event_secret` обязателен
+(fail-closed): без него коннектор не инициализируется (`ConfigurationError`), а каждое
+событие с отсутствующим или несовпадающим токеном отклоняется.

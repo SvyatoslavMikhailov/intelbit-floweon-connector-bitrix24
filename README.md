@@ -38,11 +38,16 @@ connector = Bitrix24Connector({
     "iblock_id": 14,
     "price_type_id": 1,
     "rate_limit_rps": 2,
+    "event_secret": "<application token исходящего вебхука>",
 })
 
 companies = await connector.read("company", {"filter": {"title": "Ромашка"}})
 await connector.write("deal", {"op": "add", "fields": {"title": "Новая сделка"}})
 ```
+
+**Fail-closed вебхуков.** `event_secret` обязателен: без него (или с пустой строкой)
+коннектор бросает `ConfigurationError` при создании и при `init()`. Каждый входящий
+вебхук проверяется по `auth[application_token]` (сравнение за постоянное время).
 
 ## Разработка
 

@@ -3,6 +3,7 @@
 from intelbit_floweon_connector_bitrix24.connector import Bitrix24Connector
 from intelbit_floweon_connector_bitrix24.webhooks import (
     Bitrix24WebhookReceiver,
+    ConfigurationError,
     WebhookValidationError,
 )
 
@@ -11,5 +12,6 @@ __version__ = "0.1.0"
 __all__ = [
     "Bitrix24Connector",
     "Bitrix24WebhookReceiver",
+    "ConfigurationError",
     "WebhookValidationError",
 ]

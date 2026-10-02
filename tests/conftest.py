@@ -9,6 +9,8 @@ from intelbit_floweon_connector_bitrix24 import Bitrix24Connector
 from tests.mock_bitrix24 import create_app
 
 MOCK_BASE = "http://mock-b24/rest/1/tok42/"
+# Явный тестовый секрет исходящих вебхуков: без него коннектор не стартует (fail-closed).
+TEST_EVENT_SECRET = "out-token"
 
 
 def make_connector(transport: httpx.ASGITransport) -> Bitrix24Connector:
@@ -18,7 +20,7 @@ def make_connector(transport: httpx.ASGITransport) -> Bitrix24Connector:
             "iblock_id": 14,
             "price_type_id": 1,
             "rate_limit_rps": 1000.0,
-            "event_secret": "out-token",
+            "event_secret": TEST_EVENT_SECRET,
         },
         _transport=transport,
     )

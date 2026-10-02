@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from intelbit_floweon_connector_bitrix24 import Bitrix24WebhookReceiver, WebhookValidationError
+from intelbit_floweon_connector_bitrix24 import (
+    Bitrix24WebhookReceiver,
+    ConfigurationError,
+    WebhookValidationError,
+)
 
 
 def _body(event: str, entity_id: str, ts: str = "1700000000", token: str = "out-token") -> bytes:
@@ -52,7 +56,23 @@ def test_bad_secret_rejected() -> None:
         receiver.parse_event(_body("ONCRMCOMPANYADD", "1", token="wrong"))
 
 
-def test_no_secret_skips_check() -> None:
-    receiver = Bitrix24WebhookReceiver()
-    event = receiver.parse_event(_body("ONCRMCONTACTUPDATE", "9", token="anything"))
-    assert event["entity"] == "contact"
+@pytest.mark.parametrize("secret", [None, ""])
+def test_no_secret_fails_closed(secret: str | None) -> None:
+    with pytest.raises(ConfigurationError, match="event_secret"):
+        Bitrix24WebhookReceiver(secret)
+
+
+def test_missing_token_rejected() -> None:
+    # Проверка выполняется всегда: тело без auth[application_token] отклоняется.
+    receiver = Bitrix24WebhookReceiver("out-token")
+    body = b"event=ONCRMCONTACTUPDATE&data[FIELDS][ID]=9&ts=1"
+    with pytest.raises(WebhookValidationError, match="application_token"):
+        receiver.parse_event(body)
+
+
+def test_secret_not_leaked_in_errors() -> None:
+    secret = "super-secret-token-value"
+    receiver = Bitrix24WebhookReceiver(secret)
+    with pytest.raises(WebhookValidationError) as exc_info:
+        receiver.parse_event(_body("ONCRMCOMPANYADD", "1", token="wrong"))
+    assert secret not in str(exc_info.value)

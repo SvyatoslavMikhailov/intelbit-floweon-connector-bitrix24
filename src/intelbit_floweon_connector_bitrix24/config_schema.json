@@ -4,7 +4,7 @@
   "title": "Bitrix24 Connector config",
   "type": "object",
   "additionalProperties": false,
-  "required": ["webhook_base_url"],
+  "required": ["webhook_base_url", "event_secret"],
   "properties": {
     "webhook_base_url": {
       "type": "string",
@@ -32,7 +32,8 @@
     },
     "event_secret": {
       "type": "string",
-      "description": "Опциональный secret для проверки исходящих вебхуков (application token)"
+      "minLength": 1,
+      "description": "Обязательный secret (application token) для проверки исходящих вебхуков; без него коннектор не стартует"
     }
   }
 }

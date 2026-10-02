@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import Any
 from urllib.parse import parse_qsl
 
@@ -25,6 +26,10 @@ _EVENT_MAP: dict[str, tuple[str, str]] = {
     "ONCRMCONTACTADD": ("contact", "add"),
     "ONCRMCONTACTUPDATE": ("contact", "update"),
 }
+
+
+class ConfigurationError(ValueError):
+    """Конфигурация коннектора неполна или небезопасна (fail-closed на инициализации)."""
 
 
 class WebhookValidationError(RuntimeError):
@@ -49,7 +54,13 @@ def _unflatten(pairs: list[tuple[str, str]]) -> dict[str, Any]:
 class Bitrix24WebhookReceiver:
     """Парсинг и валидация исходящих вебхуков коробки Bitrix24."""
 
-    def __init__(self, event_secret: str | None = None) -> None:
+    def __init__(self, event_secret: str | None) -> None:
+        # Fail-closed: без секрета приём вебхуков не стартует (иначе принимался бы
+        # любой POST). Значение секрета в текст ошибки не попадает.
+        if not event_secret:
+            raise ConfigurationError(
+                "event_secret не задан: приём исходящих вебхуков Bitrix24 без секрета запрещён"
+            )
         self._secret = event_secret
 
     def parse_event(self, body: bytes) -> dict[str, Any]:
@@ -78,8 +89,8 @@ class Bitrix24WebhookReceiver:
         }
 
     def _verify_secret(self, parsed: dict[str, Any]) -> None:
-        if not self._secret:
-            return
         auth = parsed.get("auth", {}) if isinstance(parsed.get("auth"), dict) else {}
-        if auth.get("application_token") != self._secret:
+        token = str(auth.get("application_token", ""))
+        # Сравнение за постоянное время — без утечки секрета по таймингу.
+        if not hmac.compare_digest(token.encode("utf-8"), self._secret.encode("utf-8")):
             raise WebhookValidationError("Неверный application_token в исходящем вебхуке")

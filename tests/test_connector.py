@@ -7,9 +7,9 @@ import pytest
 from floweon_sdk import ConnectorPlugin
 from floweon_sdk.connector import PluginContext
 
-from intelbit_floweon_connector_bitrix24 import Bitrix24Connector
+from intelbit_floweon_connector_bitrix24 import Bitrix24Connector, ConfigurationError
 from intelbit_floweon_connector_bitrix24.connector import _MANIFEST
-from tests.conftest import MOCK_BASE, make_connector
+from tests.conftest import MOCK_BASE, TEST_EVENT_SECRET, make_connector
 from tests.mock_bitrix24 import create_app
 
 
@@ -33,7 +33,9 @@ async def test_lifecycle(connector: Bitrix24Connector) -> None:
 
 async def test_health_unconfigured() -> None:
     transport = httpx.ASGITransport(app=create_app())
-    connector = Bitrix24Connector({"webhook_base_url": ""}, _transport=transport)
+    connector = Bitrix24Connector(
+        {"webhook_base_url": "", "event_secret": TEST_EVENT_SECRET}, _transport=transport
+    )
     health = await connector.health_check()
     assert health.healthy is False
     assert "webhook_base_url" in health.message
@@ -41,7 +43,15 @@ async def test_health_unconfigured() -> None:
 
 async def test_init_rebuilds_from_context(transport: httpx.ASGITransport) -> None:
     connector = make_connector(transport)
-    await connector.init(PluginContext({"webhook_base_url": MOCK_BASE, "rate_limit_rps": 1000.0}))
+    await connector.init(
+        PluginContext(
+            {
+                "webhook_base_url": MOCK_BASE,
+                "rate_limit_rps": 1000.0,
+                "event_secret": TEST_EVENT_SECRET,
+            }
+        )
+    )
     companies = await connector.read("company", {})
     assert len(companies) == 3
 
@@ -82,7 +92,11 @@ async def test_query_limit_backoff() -> None:
     # Помеченный метод первый раз отдаёт QUERY_LIMIT_EXCEEDED → клиент ретраит и проходит.
     transport = httpx.ASGITransport(app=create_app(limit_methods=frozenset({"crm.company.list"})))
     connector = Bitrix24Connector(
-        {"webhook_base_url": MOCK_BASE, "rate_limit_rps": 1000.0},
+        {
+            "webhook_base_url": MOCK_BASE,
+            "rate_limit_rps": 1000.0,
+            "event_secret": TEST_EVENT_SECRET,
+        },
         _transport=transport,
     )
     companies = await connector.read("company", {})
@@ -97,3 +111,19 @@ async def test_subscribe_event(connector: Bitrix24Connector) -> None:
     event = await connector.subscribe({}, body)
     assert event["entity"] == "deal"
     assert event["idempotency_key"] == "bitrix24:ONCRMDEALUPDATE:301:1700000000"
+
+
+@pytest.mark.parametrize("secret", [None, ""])
+def test_missing_event_secret_fails_closed(secret: str | None) -> None:
+    # Fail-closed: без секрета вебхуков коннектор не создаётся.
+    config: dict[str, object] = {"webhook_base_url": MOCK_BASE}
+    if secret is not None:
+        config["event_secret"] = secret
+    with pytest.raises(ConfigurationError, match="event_secret"):
+        Bitrix24Connector(config)
+
+
+async def test_init_without_secret_fails_closed(transport: httpx.ASGITransport) -> None:
+    connector = make_connector(transport)
+    with pytest.raises(ConfigurationError):
+        await connector.init(PluginContext({"webhook_base_url": MOCK_BASE}))
