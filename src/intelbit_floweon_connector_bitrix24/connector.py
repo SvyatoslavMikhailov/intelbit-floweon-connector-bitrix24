@@ -27,7 +27,7 @@ _UPSERT_ENTITIES = frozenset({"product", "price", "store_product"})
 
 _MANIFEST = PluginManifest(
     id="intelbit.floweon.connector.bitrix24",
-    version="0.2.0",
+    version="0.2.1",
     plugin_type=PluginType.CONNECTOR,
     name="Bitrix24 Connector",
     description="Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон",

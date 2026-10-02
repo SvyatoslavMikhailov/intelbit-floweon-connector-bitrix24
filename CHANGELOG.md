@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-10-02
+
+### Изменено
+
+- SDK `intelbit-floweon-sdk` `v0.3.0` (PluginRunner с долгоживущим loop — состояние клиентского
+  rate limiter сохраняется между вызовами, фактический rps не замерялся; PluginEntrypoint в SDK) (4-17-25).
+- Upsert по `code` для `product`, `price`, `store_product` (запись из маппинга пресета без
+  `fields`); склад остатков — настройка `store_id`.
+- Мок Bitrix24: фильтры каталога/цен/остатков, `create_app(extended=True)` (4 компании
+  для сценариев потока A), `GET /_state`; dev-зависимость `python-multipart`.
+
 ## [0.2.0] — 2026-10-02
 
 ### Добавлено
