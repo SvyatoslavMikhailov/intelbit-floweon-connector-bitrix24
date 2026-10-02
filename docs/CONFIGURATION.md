@@ -9,6 +9,9 @@
 | `price_type_id` | int | нет | ID типа цены (`catalog.priceType`) для чтения/записи цен |
 | `rate_limit_rps` | number | нет | Лимит запросов в секунду (по умолчанию 2) |
 | `timeout` | number | нет | Таймаут HTTP-запроса, сек (по умолчанию 30) |
+| `ca_bundle` | string | нет | Путь к корпоративному CA для TLS к порталу; пусто — системные сертификаты |
+| `verify_ssl` | bool | нет | Проверка TLS-сертификата (по умолчанию `true`); `false` — только с `allow_insecure_tls` |
+| `allow_insecure_tls` | bool | нет | Разрешить `verify_ssl=false` (LAN-стенд с самоподписанным сертификатом) |
 | `event_secret` | string | **да** | `application_token` для проверки исходящих вебхуков (без него — `ConfigurationError`) |
 
 ## Пример

@@ -10,6 +10,8 @@ reload) + read/write. Дополнительно — subscribe (приём ис�
 
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -21,19 +23,61 @@ from intelbit_floweon_connector_bitrix24.domains.catalog import CatalogDomain
 from intelbit_floweon_connector_bitrix24.domains.companies import CompaniesDomain
 from intelbit_floweon_connector_bitrix24.domains.deals import DealsDomain
 from intelbit_floweon_connector_bitrix24.domains.stock import StockDomain
-from intelbit_floweon_connector_bitrix24.webhooks import Bitrix24WebhookReceiver
+from intelbit_floweon_connector_bitrix24.webhooks import (
+    Bitrix24WebhookReceiver,
+    ConfigurationError,
+)
 
 _UPSERT_ENTITIES = frozenset({"product", "price", "store_product"})
 
+logger = logging.getLogger(__name__)
+
 _MANIFEST = PluginManifest(
     id="intelbit.floweon.connector.bitrix24",
-    version="0.2.1",
+    version="0.2.2",
     plugin_type=PluginType.CONNECTOR,
     name="Bitrix24 Connector",
     description="Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон",
     author="ООО Интелбит",
     license="Apache-2.0",
 )
+
+
+def _flag(value: Any, default: bool) -> bool:
+    """Булево из конфига: после подстановки ${ENV} значения приходят строками."""
+    if value is None or value == "":
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() not in ("0", "false", "no", "off")
+    return bool(value)
+
+
+def _resolve_tls(cfg: dict[str, Any]) -> tuple[bool, str | None]:
+    """(verify, ca_bundle) для клиента — по образцу коннектора SAP (4-17-23).
+
+    Непустой `ca_bundle` важнее `verify_ssl`; пустая строка (`${BITRIX_CA_BUNDLE:-}`
+    без значения) — «не задан». Отключение проверки — только с `allow_insecure_tls`.
+
+    Raises:
+        ConfigurationError: файла CA нет или `verify_ssl=false` без `allow_insecure_tls`.
+    """
+    ca_bundle = str(cfg.get("ca_bundle") or "").strip() or None
+    if ca_bundle is not None:
+        if not Path(ca_bundle).is_file():
+            raise ConfigurationError(f"ca_bundle: файл корпоративного CA не найден: {ca_bundle}")
+        return True, ca_bundle
+    if not _flag(cfg.get("verify_ssl"), True):
+        if not _flag(cfg.get("allow_insecure_tls"), False):
+            raise ConfigurationError(
+                "verify_ssl=false запрещён без allow_insecure_tls=true "
+                "(или укажите ca_bundle с корпоративным CA)"
+            )
+        logger.warning(
+            "Bitrix24: проверка TLS-сертификата ОТКЛЮЧЕНА (allow_insecure_tls=true) — "
+            "допустимо только для LAN-стенда"
+        )
+        return False, None
+    return True, None
 
 
 class Bitrix24Connector(ConnectorPlugin):
@@ -52,10 +96,13 @@ class Bitrix24Connector(ConnectorPlugin):
 
     def _build(self) -> None:
         cfg = self.config
+        verify, ca_bundle = _resolve_tls(cfg)
         self._client = Bitrix24Client(
             str(cfg["webhook_base_url"]),
             rps=float(cfg.get("rate_limit_rps", 2.0)),
             timeout=float(cfg.get("timeout", 30.0)),
+            verify=verify,
+            ca_bundle=ca_bundle,
             _transport=self._transport,
         )
         self.companies = CompaniesDomain(self._client)

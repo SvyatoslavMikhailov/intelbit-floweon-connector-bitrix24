@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-10-02
+
+### Добавлено
+
+- TLS к порталу: `ca_bundle` (корпоративный CA), `verify_ssl`, `allow_insecure_tls` — по
+  образцу коннектора SAP; `verify_ssl=false` без `allow_insecure_tls` и отсутствующий файл
+  CA → `ConfigurationError`. Зависимость `intelbit-bitrix24-client` `v0.2.0` (параметры
+  `verify` / `ca_bundle`). Заметка README «ожидает v0.2» снята (4-17-26).
+
 ## [0.2.1] — 2026-10-02
 
 ### Изменено

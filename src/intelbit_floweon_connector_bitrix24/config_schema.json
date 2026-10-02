@@ -4,7 +4,10 @@
   "title": "Bitrix24 Connector config",
   "type": "object",
   "additionalProperties": false,
-  "required": ["webhook_base_url", "event_secret"],
+  "required": [
+    "webhook_base_url",
+    "event_secret"
+  ],
   "properties": {
     "webhook_base_url": {
       "type": "string",
@@ -20,7 +23,10 @@
       "description": "ID типа цены (catalog.priceType) для чтения/записи цен"
     },
     "store_id": {
-      "type": ["integer", "string"],
+      "type": [
+        "integer",
+        "string"
+      ],
       "pattern": "^[0-9]+$",
       "description": "ID склада (catalog.store) для upsert остатков store_product по code товара"
     },
@@ -39,6 +45,26 @@
       "type": "string",
       "minLength": 1,
       "description": "Обязательный secret (application token) для проверки исходящих вебхуков; без него коннектор не стартует"
+    },
+    "ca_bundle": {
+      "type": "string",
+      "description": "Путь к корпоративному CA для TLS к порталу; пусто — системные сертификаты"
+    },
+    "verify_ssl": {
+      "type": [
+        "boolean",
+        "string"
+      ],
+      "default": true,
+      "description": "Проверка TLS-сертификата портала; false допускается только с allow_insecure_tls"
+    },
+    "allow_insecure_tls": {
+      "type": [
+        "boolean",
+        "string"
+      ],
+      "default": false,
+      "description": "Разрешить verify_ssl=false (LAN-стенд с самоподписанным сертификатом)"
     }
   }
 }
