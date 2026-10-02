@@ -40,9 +40,7 @@ class CompaniesDomain:
 
     async def update(self, company_id: int | str, data: dict[str, Any]) -> bool:
         fields = fieldmaps.to_bitrix(data, fieldmaps.COMPANY)
-        env = await self._client.call(
-            "crm.company.update", {"id": company_id, "fields": fields}
-        )
+        env = await self._client.call("crm.company.update", {"id": company_id, "fields": fields})
         return bool(env.get("result"))
 
     async def delete(self, company_id: int | str) -> bool:

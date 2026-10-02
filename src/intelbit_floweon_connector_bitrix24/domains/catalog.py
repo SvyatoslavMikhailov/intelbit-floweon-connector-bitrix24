@@ -23,8 +23,13 @@ def _element_id(env: dict[str, Any]) -> int:
 class CatalogDomain:
     """Товары торгового каталога и их цены."""
 
-    def __init__(self, client: Bitrix24Client, *, iblock_id: int | None = None,
-                 price_type_id: int | None = None) -> None:
+    def __init__(
+        self,
+        client: Bitrix24Client,
+        *,
+        iblock_id: int | None = None,
+        price_type_id: int | None = None,
+    ) -> None:
         self._client = client
         self._iblock_id = iblock_id
         self._price_type_id = price_type_id

@@ -71,15 +71,25 @@ def _seed() -> dict[str, Any]:
             103: {"id": 103, "iblockId": 14, "name": "Шайба 6", "measure": 5},
         },
         "prices": {
-            1001: {"id": 1001, "productId": 101, "catalogGroupId": 1, "price": 12.5,
-                   "currency": "RUB"},
+            1001: {
+                "id": 1001,
+                "productId": 101,
+                "catalogGroupId": 1,
+                "price": 12.5,
+                "currency": "RUB",
+            },
         },
         "stores": {
             201: {"id": 201, "title": "Главный склад", "active": "Y", "address": "Москва"},
         },
         "storeproducts": {
-            5001: {"id": 5001, "storeId": 201, "productId": 101, "amount": 100,
-                   "quantityReserved": 5},
+            5001: {
+                "id": 5001,
+                "storeId": 201,
+                "productId": 101,
+                "amount": 100,
+                "quantityReserved": 5,
+            },
         },
         "deals": {
             301: {"ID": "301", "TITLE": "Поставка №1", "STAGE_ID": "NEW", "OPPORTUNITY": "1000"},
@@ -87,8 +97,15 @@ def _seed() -> dict[str, Any]:
             303: {"ID": "303", "TITLE": "Поставка №3", "STAGE_ID": "WON", "OPPORTUNITY": "3000"},
         },
         "deal_rows": {
-            301: [{"PRODUCT_ID": "101", "PRODUCT_NAME": "Болт М6", "PRICE": "12.5",
-                   "QUANTITY": "10", "MEASURE_CODE": "796"}],
+            301: [
+                {
+                    "PRODUCT_ID": "101",
+                    "PRODUCT_NAME": "Болт М6",
+                    "PRICE": "12.5",
+                    "QUANTITY": "10",
+                    "MEASURE_CODE": "796",
+                }
+            ],
         },
     }
 

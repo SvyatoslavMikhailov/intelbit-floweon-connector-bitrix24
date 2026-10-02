@@ -56,8 +56,13 @@ async def test_productrows_set(connector: Bitrix24Connector) -> None:
         {
             "deal_id": 302,
             "rows": [
-                {"product_id": 102, "product_name": "Гайка М6", "price": 5, "quantity": 4,
-                 "measure_code": 796}
+                {
+                    "product_id": 102,
+                    "product_name": "Гайка М6",
+                    "price": 5,
+                    "quantity": 4,
+                    "measure_code": 796,
+                }
             ],
         },
     )

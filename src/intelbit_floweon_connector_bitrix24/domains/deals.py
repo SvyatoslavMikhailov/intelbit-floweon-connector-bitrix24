@@ -52,11 +52,7 @@ class DealsDomain:
         rows = env.get("result", []) or []
         return [fieldmaps.to_canonical(r, fieldmaps.DEAL_PRODUCTROW) for r in rows]
 
-    async def set_productrows(
-        self, deal_id: int | str, rows: list[dict[str, Any]]
-    ) -> bool:
+    async def set_productrows(self, deal_id: int | str, rows: list[dict[str, Any]]) -> bool:
         b24_rows = [fieldmaps.to_bitrix(r, fieldmaps.DEAL_PRODUCTROW) for r in rows]
-        env = await self._client.call(
-            "crm.deal.productrows.set", {"id": deal_id, "rows": b24_rows}
-        )
+        env = await self._client.call("crm.deal.productrows.set", {"id": deal_id, "rows": b24_rows})
         return bool(env.get("result"))

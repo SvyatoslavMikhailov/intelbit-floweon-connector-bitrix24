@@ -33,9 +33,7 @@ async def test_lifecycle(connector: Bitrix24Connector) -> None:
 
 async def test_health_unconfigured() -> None:
     transport = httpx.ASGITransport(app=create_app())
-    connector = Bitrix24Connector(
-        {"webhook_base_url": ""}, _transport=transport
-    )
+    connector = Bitrix24Connector({"webhook_base_url": ""}, _transport=transport)
     health = await connector.health_check()
     assert health.healthy is False
     assert "webhook_base_url" in health.message
