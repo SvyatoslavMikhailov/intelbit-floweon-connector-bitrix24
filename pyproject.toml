@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "intelbit-floweon-connector-bitrix24"
 description = "Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон"
-version = "0.2.2"
+version = "0.3.0"
 authors = [{ name = "Святослав Михайлов", email = "vceo@intelbit.ru" }]
 readme = "README.md"
 requires-python = ">=3.12"
@@ -20,6 +20,10 @@ dependencies = [
 # Резолв коннектора ядром по `type` из connectors/*.yaml пресета (floweon run, 4-17-24).
 [project.entry-points."floweon.connectors"]
 "intelbit.connector.bitrix24" = "intelbit_floweon_connector_bitrix24.connector:Bitrix24Connector"
+
+# Нотификатор: проблемы шины → задачи Bitrix24 (floweon run, 4-17-27).
+[project.entry-points."floweon.notifiers"]
+"intelbit.notifier.bitrix24_tasks" = "intelbit_floweon_connector_bitrix24.notifier:Bitrix24TasksNotifier"
 
 [project.optional-dependencies]
 dev = [
@@ -39,8 +43,8 @@ Homepage = "https://github.com/SvyatoslavMikhailov/intelbit-floweon-connector-bi
 Repository = "https://github.com/SvyatoslavMikhailov/intelbit-floweon-connector-bitrix24"
 
 [tool.uv.sources]
-intelbit-bitrix24-client = { git = "https://github.com/SvyatoslavMikhailov/intelbit-bitrix24-client", tag = "v0.2.0" }
-intelbit-floweon-sdk = { git = "https://github.com/SvyatoslavMikhailov/intelbit-floweon-sdk", tag = "v0.3.0" }
+intelbit-bitrix24-client = { git = "https://github.com/SvyatoslavMikhailov/intelbit-bitrix24-client", tag = "v0.3.0" }
+intelbit-floweon-sdk = { git = "https://github.com/SvyatoslavMikhailov/intelbit-floweon-sdk", tag = "v0.3.1" }
 
 [tool.ruff]
 line-length = 100

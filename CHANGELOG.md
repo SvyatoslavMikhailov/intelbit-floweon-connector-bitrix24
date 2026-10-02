@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-02
+
+### Добавлено
+
+- Идемпотентное создание задач: тег `fl-<sha1(ключа дедупа)[:10]>` и `find(dedup_key)` —
+  если ответ на `tasks.task.add` потерян (502 прокси, таймаут), ядро находит уже созданную
+  задачу вместо дубля. Мок: фильтр `tasks.task.list` по `TAG`, хук `POST /_fail`
+  (`after_store` — задача сохранена, ответ 502).
+
+- Нотификатор `Bitrix24TasksNotifier` (entry point `floweon.notifiers` →
+  `intelbit.notifier.bitrix24_tasks`): проблемы шины Фловеона — задачами Bitrix24 (4-17-27).
+  - `notify(mode=create)` — `tasks.task.add`: `TITLE` (≤ 250), `DESCRIPTION` (BBCode
+    экранирован), `RESPONSIBLE_ID`, `GROUP_ID`, `DEADLINE` (now + `deadline_hours`, ISO с
+    таймзоной), `TAGS` (`floweon`, пресет), `UF_CRM_TASK` (привязка к карточке CRM),
+    `PRIORITY` 2 для ошибок;
+  - `notify(mode=comment)` — сообщение в чат задачи REST v3
+    `tasks.task.chat.message.send` (ZWSP-экранирование); без v3 — запасной
+    `task.comment.add` (форум, в интерфейсе задачи не виден) и `comments_channel=forum`
+    в health;
+  - `notify(mode=send)` — `im.message.add` (сводка, ≤ 4000 символов);
+  - `status(task_id)` — `tasks.task.get` (`select` ЗАГЛАВНЫМИ), открыта при статусе 2/3/4/6.
+- Мок Bitrix24: `tasks.task.add/get/update/list`, `task.comment.add`, `im.message.add`,
+  REST v3 `/rest/api/…/tasks.task.chat.message.send`, `create_app(v3_enabled=False)`, хук
+  `POST /_tasks/{id}/status`; `/_state` — `tasks`, `task_chat`, `task_forum`, `im_messages`.
+
+### Изменено
+
+- SDK `v0.3.1` (`NotifierPlugin.notify/status`), `intelbit-bitrix24-client` `v0.3.0`
+  (`call_v3`, `bbcode`).
+
 ## [0.2.2] — 2026-10-02
 
 ### Добавлено

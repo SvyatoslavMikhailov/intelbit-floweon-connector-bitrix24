@@ -49,6 +49,22 @@ await connector.write("deal", {"op": "add", "fields": {"title": "Новая сд
 коннектор бросает `ConfigurationError` при создании и при `init()`. Каждый входящий
 вебхук проверяется по `auth[application_token]` (сравнение за постоянное время).
 
+## Нотификатор задач Bitrix24
+
+`intelbit.notifier.bitrix24_tasks` (`Bitrix24TasksNotifier`, группа entry points
+`floweon.notifiers`) доставляет проблемы шины людям в Bitrix24. Конфиг — тот же, что у
+коннектора пресета (`webhook_base_url`, `rate_limit_rps`, TLS); секрет вебхуков не нужен.
+Входящему вебхуку нужны права **task** и **im**.
+
+| Режим `notify` | Метод портала | Что происходит |
+|---|---|---|
+| `create` | `tasks.task.add` | задача: ответственный, группа, дедлайн, теги `floweon`/пресет, `UF_CRM_TASK` (карточка CRM), приоритет для ошибок |
+| `comment` | v3 `tasks.task.chat.message.send` | сообщение в чат задачи (его видит человек); без v3 — форум `task.comment.add` и `comments_channel=forum` в health |
+| `send` | `im.message.add` | сообщение в чат/пользователю (сводка, ≤ 4000 символов) |
+
+`status(task_id)` — открыта ли задача (2/3/4/6 — открыта, 5/7 — закрыта). Дедупликацию
+(«одна открытая задача на одну проблему») ведёт ядро Фловеона.
+
 ## TLS и корпоративный CA
 
 Проверка TLS-сертификата портала — через `intelbit-bitrix24-client` ≥ 0.2.0:

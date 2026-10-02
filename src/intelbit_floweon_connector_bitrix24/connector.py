@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 _MANIFEST = PluginManifest(
     id="intelbit.floweon.connector.bitrix24",
-    version="0.2.2",
+    version="0.3.0",
     plugin_type=PluginType.CONNECTOR,
     name="Bitrix24 Connector",
     description="Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон",
