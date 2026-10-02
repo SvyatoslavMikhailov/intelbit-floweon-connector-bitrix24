@@ -7,7 +7,7 @@ from intelbit_floweon_connector_bitrix24.webhooks import (
     WebhookValidationError,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "Bitrix24Connector",

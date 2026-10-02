@@ -25,7 +25,7 @@ from intelbit_floweon_connector_bitrix24.webhooks import Bitrix24WebhookReceiver
 
 _MANIFEST = PluginManifest(
     id="intelbit.floweon.connector.bitrix24",
-    version="0.1.0",
+    version="0.2.0",
     plugin_type=PluginType.CONNECTOR,
     name="Bitrix24 Connector",
     description="Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон",

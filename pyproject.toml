@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "intelbit-floweon-connector-bitrix24"
 description = "Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон"
-version = "0.1.0"
+version = "0.2.0"
 authors = [{ name = "Святослав Михайлов", email = "vceo@intelbit.ru" }]
 readme = "README.md"
 requires-python = ">=3.12"
@@ -16,6 +16,10 @@ dependencies = [
     "intelbit-bitrix24-client",
     "intelbit-floweon-sdk",
 ]
+
+# Резолв коннектора ядром по `type` из connectors/*.yaml пресета (floweon run, 4-17-24).
+[project.entry-points."floweon.connectors"]
+"intelbit.connector.bitrix24" = "intelbit_floweon_connector_bitrix24.connector:Bitrix24Connector"
 
 [project.optional-dependencies]
 dev = [
