@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from intelbit_river_connector_bitrix24 import Bitrix24Connector
+from intelbit_floweon_connector_bitrix24 import Bitrix24Connector
 from tests.mock_bitrix24 import create_app
 
 MOCK_BASE = "http://mock-b24/rest/1/tok42/"

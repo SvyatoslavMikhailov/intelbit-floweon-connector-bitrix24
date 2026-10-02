@@ -1,6 +1,6 @@
 # Конфигурация коннектора Bitrix24
 
-Схема — `src/intelbit_river_connector_bitrix24/config_schema.json`.
+Схема — `src/intelbit_floweon_connector_bitrix24/config_schema.json`.
 
 | Параметр | Тип | Обяз. | Назначение |
 |----------|-----|:-----:|------------|

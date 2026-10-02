@@ -1,6 +1,6 @@
-# intelbit-river-connector-bitrix24
+# intelbit-floweon-connector-bitrix24
 
-Коннектор **Bitrix24 (коробка)** для платформы **Интелбит:Река**. Обмен по REST-сервису
+Коннектор **Bitrix24 (коробка)** для платформы **Интелбит.Фловеон**. Обмен по REST-сервису
 входящего вебхука по четырём доменам со **стандартными полями** Bitrix24:
 
 | Домен | Сущности | Методы Bitrix24 |
@@ -22,15 +22,16 @@
 - Для каталога/остатков надёжных событий у коробки нет → синхронизация **pull**
   (по расписанию в пресете).
 
-Построен на общем Apache-клиенте [`intelbit-bitrix24-client`](../intelbit-bitrix24-client)
-и SDK [`river-sdk`](../intelbit-river-monorepo/packages/sdk).
+Построен на общем Apache-клиенте [`intelbit-bitrix24-client`](https://github.com/SvyatoslavMikhailov/intelbit-bitrix24-client)
+и SDK [`intelbit-floweon-sdk`](https://github.com/SvyatoslavMikhailov/intelbit-floweon-sdk)
+(оба — публичные git-теги в `[tool.uv.sources]`).
 
 ## Конфигурация
 
-См. `src/intelbit_river_connector_bitrix24/config_schema.json` и `docs/CONFIGURATION.md`.
+См. `src/intelbit_floweon_connector_bitrix24/config_schema.json` и `docs/CONFIGURATION.md`.
 
 ```python
-from intelbit_river_connector_bitrix24 import Bitrix24Connector
+from intelbit_floweon_connector_bitrix24 import Bitrix24Connector
 
 connector = Bitrix24Connector({
     "webhook_base_url": "https://portal.bitrix24.ru/rest/1/xxxxxxxx/",
@@ -52,5 +53,6 @@ uv run mypy
 uv run pytest
 ```
 
-CI (`.github/workflows/ci.yml`) подкладывает соседние репо `intelbit-bitrix24-client` и
-`intelbit-river-monorepo` рядом и гоняет ruff + mypy(strict) + pytest.
+CI (`.github/workflows/ci.yml`) ставит зависимости из публичных git-тегов
+(`intelbit-bitrix24-client` v0.1.0, `intelbit-floweon-sdk` v0.2.0) и гоняет
+ruff + mypy(strict) + pytest.

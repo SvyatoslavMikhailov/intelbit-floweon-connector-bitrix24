@@ -11,7 +11,7 @@ from typing import Any
 
 from intelbit_bitrix24_client import Bitrix24Client
 
-from intelbit_river_connector_bitrix24 import fieldmaps
+from intelbit_floweon_connector_bitrix24 import fieldmaps
 
 
 def _element_id(env: dict[str, Any]) -> int:

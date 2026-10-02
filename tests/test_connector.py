@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from river_sdk import ConnectorPlugin
-from river_sdk.connector import PluginContext
+from floweon_sdk import ConnectorPlugin
+from floweon_sdk.connector import PluginContext
 
-from intelbit_river_connector_bitrix24 import Bitrix24Connector
-from intelbit_river_connector_bitrix24.connector import _MANIFEST
+from intelbit_floweon_connector_bitrix24 import Bitrix24Connector
+from intelbit_floweon_connector_bitrix24.connector import _MANIFEST
 from tests.conftest import MOCK_BASE, make_connector
 from tests.mock_bitrix24 import create_app
 
@@ -18,7 +18,7 @@ def test_is_connector_plugin() -> None:
 
 
 def test_manifest_fields() -> None:
-    assert _MANIFEST.id == "intelbit.river.connector.bitrix24"
+    assert _MANIFEST.id == "intelbit.floweon.connector.bitrix24"
     assert _MANIFEST.plugin_type == "connector"
     assert _MANIFEST.license == "Apache-2.0"
     assert Bitrix24Connector.manifest is _MANIFEST

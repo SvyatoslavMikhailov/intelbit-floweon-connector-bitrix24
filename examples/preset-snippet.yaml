@@ -3,7 +3,7 @@
 
 connectors:
   bitrix24:
-    plugin: intelbit.river.connector.bitrix24
+    plugin: intelbit.floweon.connector.bitrix24
     config:
       webhook_base_url: "${BITRIX_WEBHOOK_URL}"
       iblock_id: 14

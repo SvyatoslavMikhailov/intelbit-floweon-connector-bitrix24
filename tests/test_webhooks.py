@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from intelbit_river_connector_bitrix24 import Bitrix24WebhookReceiver, WebhookValidationError
+from intelbit_floweon_connector_bitrix24 import Bitrix24WebhookReceiver, WebhookValidationError
 
 
 def _body(event: str, entity_id: str, ts: str = "1700000000", token: str = "out-token") -> bytes:

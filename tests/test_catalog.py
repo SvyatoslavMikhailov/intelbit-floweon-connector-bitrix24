@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from intelbit_river_connector_bitrix24 import Bitrix24Connector
+from intelbit_floweon_connector_bitrix24 import Bitrix24Connector
 
 pytestmark = pytest.mark.contract
 

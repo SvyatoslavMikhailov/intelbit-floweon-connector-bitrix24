@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://intelbit.studio/river/connector-bitrix24/config.schema.json",
+  "$id": "https://intelbit.studio/floweon/connector-bitrix24/config.schema.json",
   "title": "Bitrix24 Connector config",
   "type": "object",
   "additionalProperties": false,

@@ -10,32 +10,21 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
+      # intelbit-bitrix24-client и floweon-sdk ставятся из публичных git-тегов —
+      # соседние репозитории и приватный монорепо не нужны.
       - uses: actions/checkout@v4
-        with:
-          # intelbit-bitrix24-client подключается по path → кладём рядом.
-          # river-sdk берётся из публичного git-тега, приватный монорепо не нужен.
-          path: intelbit-river-connector-bitrix24
-
-      - uses: actions/checkout@v4
-        with:
-          repository: SvyatoslavMikhailov/intelbit-bitrix24-client
-          path: intelbit-bitrix24-client
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
       - name: Sync
-        working-directory: intelbit-river-connector-bitrix24
         run: uv sync --extra dev
 
       - name: Ruff
-        working-directory: intelbit-river-connector-bitrix24
         run: uv run ruff check .
 
       - name: Mypy (strict)
-        working-directory: intelbit-river-connector-bitrix24
         run: uv run mypy
 
       - name: Pytest
-        working-directory: intelbit-river-connector-bitrix24
         run: uv run pytest

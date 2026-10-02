@@ -1,12 +1,17 @@
-# CLAUDE.md — intelbit-river-connector-bitrix24
+# CLAUDE.md — intelbit-floweon-connector-bitrix24
 
 Гайд для Claude Code по этому репозиторию.
 
 ## Что это
 
-Коннектор Bitrix24-коробки для Интелбит:Река. Ядро со **стандартными полями** четырёх
+Коннектор Bitrix24-коробки для Интелбит.Фловеон. Ядро со **стандартными полями** четырёх
 доменов (контрагенты, материалы+цены, остатки, сделки). Построен на общем Apache-клиенте
-`intelbit-bitrix24-client` и контракте `ConnectorPlugin` из `river-sdk`.
+`intelbit-bitrix24-client` и контракте `ConnectorPlugin` из `floweon-sdk`.
+
+## Документация
+
+Проектная документация — Obsidian, папка `4 Мои проекты/4-17 Интелбит Фловеон/`;
+промпты — `04 Промпты для Claude Code/`, статус — `04 Промпты для Claude Code/Статус разработки.md`.
 
 ## Архитектура
 
@@ -43,10 +48,10 @@ uv run mypy
 uv run pytest          # -m contract для contract-тестов
 ```
 
-## Зависимости-соседи (path/editable)
+## Зависимости (git-теги в `[tool.uv.sources]`)
 
-- `../intelbit-bitrix24-client` — REST-клиент Bitrix24.
-- `../intelbit-river-monorepo/packages/sdk` — `river-sdk` (`ConnectorPlugin`, manifest).
+- `intelbit-bitrix24-client` (тег `v0.1.0`) — REST-клиент Bitrix24.
+- `intelbit-floweon-sdk` (тег `v0.2.0`) — `floweon_sdk` (`ConnectorPlugin`, manifest).
 
 ---
 

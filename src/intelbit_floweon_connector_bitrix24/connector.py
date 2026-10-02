@@ -1,7 +1,7 @@
-"""Bitrix24Connector — коннектор Bitrix24 (коробка) для Интелбит:Река (ADR-006).
+"""Bitrix24Connector — коннектор Bitrix24 (коробка) для Интелбит.Фловеон (ADR-006).
 
 Композиция четырёх доменных адаптеров поверх общего Bitrix24Client. Реализует
-контракт `ConnectorPlugin` из river-sdk: lifecycle (init/start/stop/health_check/
+контракт `ConnectorPlugin` из floweon-sdk: lifecycle (init/start/stop/health_check/
 reload) + read/write. Дополнительно — subscribe (приём исходящих вебхуков коробки).
 
 Все методы idempotent относительно retry; in-memory state между вызовами не держим
@@ -13,22 +13,22 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
+from floweon_sdk import ConnectorPlugin, PluginManifest, PluginType
+from floweon_sdk.connector import PluginContext, PluginHealth
 from intelbit_bitrix24_client import Bitrix24Client
-from river_sdk import ConnectorPlugin, PluginManifest, PluginType
-from river_sdk.connector import PluginContext, PluginHealth
 
-from intelbit_river_connector_bitrix24.domains.catalog import CatalogDomain
-from intelbit_river_connector_bitrix24.domains.companies import CompaniesDomain
-from intelbit_river_connector_bitrix24.domains.deals import DealsDomain
-from intelbit_river_connector_bitrix24.domains.stock import StockDomain
-from intelbit_river_connector_bitrix24.webhooks import Bitrix24WebhookReceiver
+from intelbit_floweon_connector_bitrix24.domains.catalog import CatalogDomain
+from intelbit_floweon_connector_bitrix24.domains.companies import CompaniesDomain
+from intelbit_floweon_connector_bitrix24.domains.deals import DealsDomain
+from intelbit_floweon_connector_bitrix24.domains.stock import StockDomain
+from intelbit_floweon_connector_bitrix24.webhooks import Bitrix24WebhookReceiver
 
 _MANIFEST = PluginManifest(
-    id="intelbit.river.connector.bitrix24",
+    id="intelbit.floweon.connector.bitrix24",
     version="0.1.0",
     plugin_type=PluginType.CONNECTOR,
     name="Bitrix24 Connector",
-    description="Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит:Река",
+    description="Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон",
     author="ООО Интелбит",
     license="Apache-2.0",
 )

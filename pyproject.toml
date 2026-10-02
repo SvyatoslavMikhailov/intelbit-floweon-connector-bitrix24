@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "intelbit-river-connector-bitrix24"
-description = "Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит:Река"
+name = "intelbit-floweon-connector-bitrix24"
+description = "Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон"
 version = "0.1.0"
 authors = [{ name = "Святослав Михайлов", email = "vceo@intelbit.ru" }]
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
     "httpx>=0.27",
     "pyyaml>=6.0",
     "intelbit-bitrix24-client",
-    "intelbit-river-sdk",
+    "intelbit-floweon-sdk",
 ]
 
 [project.optional-dependencies]
@@ -31,12 +31,12 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/SvyatoslavMikhailov/intelbit-river-connector-bitrix24"
-Repository = "https://github.com/SvyatoslavMikhailov/intelbit-river-connector-bitrix24"
+Homepage = "https://github.com/SvyatoslavMikhailov/intelbit-floweon-connector-bitrix24"
+Repository = "https://github.com/SvyatoslavMikhailov/intelbit-floweon-connector-bitrix24"
 
 [tool.uv.sources]
-intelbit-bitrix24-client = { path = "../intelbit-bitrix24-client", editable = true }
-intelbit-river-sdk = { git = "https://github.com/SvyatoslavMikhailov/intelbit-river-sdk", tag = "v0.1.0" }
+intelbit-bitrix24-client = { git = "https://github.com/SvyatoslavMikhailov/intelbit-bitrix24-client", tag = "v0.1.0" }
+intelbit-floweon-sdk = { git = "https://github.com/SvyatoslavMikhailov/intelbit-floweon-sdk", tag = "v0.2.0" }
 
 [tool.ruff]
 line-length = 100
