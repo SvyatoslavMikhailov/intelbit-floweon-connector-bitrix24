@@ -127,10 +127,11 @@ class Bitrix24Connector(ConnectorPlugin):
 
         Два контракта:
         - `data.op` ∈ {add, update, delete}, поля — в `data.fields` (прежний);
-        - канонический запись маппинга пресета (без ключа `fields`) для `product`,
-          `price`, `store_product` — upsert по `code` товара.
+        - каноническая запись маппинга пресета (без ключей `fields` и `op`) для
+          `product`, `price`, `store_product` — upsert по `code` товара.
+          Явный `op` (например, `{"op": "delete", "id": 5}`) — всегда прежний контракт.
         """
-        if "fields" not in data and entity in _UPSERT_ENTITIES:
+        if "fields" not in data and "op" not in data and entity in _UPSERT_ENTITIES:
             return await self._upsert(entity, data)
         op = data.get("op", "add")
         fields = data.get("fields", {})

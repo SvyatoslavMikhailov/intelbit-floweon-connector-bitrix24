@@ -137,3 +137,13 @@ class TestExtendedMock:
         assert await connector.read("store_product", {"store_id": 201, "product_id": 102}) == []
         assert len(await connector.read("price", {"product_id": 101})) == 1
         assert await connector.read("price", {"product_id": 103}) == []
+
+
+class TestLegacyContract:
+    async def test_explicit_op_without_fields_not_upsert(
+        self, transport: httpx.ASGITransport
+    ) -> None:
+        """op без fields — прежний контракт, а не upsert по code (регрессия 4-17-25)."""
+        connector = _connector(transport)
+        result = await connector.write("product", {"op": "update", "id": 101})
+        assert "updated" in result
