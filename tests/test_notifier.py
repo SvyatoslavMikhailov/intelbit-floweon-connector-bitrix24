@@ -117,7 +117,24 @@ class TestComment:
         assert state["task_forum"] == [{"task_id": int(created["external_id"]), "text": "x"}]
         health = await notifier.health_check()
         assert health.healthy is True
-        assert health.message == "comments_channel=forum"
+        assert health.message == "comments_channel=forum (портал без REST v3)"
+
+    async def test_forum_fallback_without_tasks_scope(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Коробка 4-17-28: вебхук со scope task (без tasks) — v3-чат INSUFFICIENTSCOPE."""
+        transport = httpx.ASGITransport(app=create_app(v3_scope=False))
+        notifier = _notifier(transport)
+        created = await notifier.notify(_create())  # type: ignore[arg-type]
+        await notifier.notify(  # type: ignore[arg-type]
+            {**_create(), "mode": "comment", "external_id": created["external_id"], "body": "x"}
+        )
+        state = await _state(transport)
+        assert state["task_chat"] == []
+        assert len(state["task_forum"]) == 1
+        health = await notifier.health_check()
+        assert health.message == "comments_channel=forum (у вебхука нет scope tasks)"
+        assert "нет scope tasks" in caplog.text
 
 
 class TestSendAndStatus:

@@ -50,13 +50,18 @@ class CompaniesDomain:
     # --- реквизиты (ИНН/КПП/ОГРН) ----------------------------------------- #
 
     async def list_requisites(self, company_id: int | str) -> list[dict[str, Any]]:
-        """Реквизиты контрагента. Возвращает канонические dict с inn/kpp/ogrn."""
+        """Реквизиты контрагента: канонические dict с inn/kpp/ogrn, реквизиты с ИНН — первыми.
+
+        Коробка при создании компании сама заводит пустой реквизит (ИНН null), поэтому
+        первым по ID часто оказывается он, а заполненный — вторым (стенд 4-17-28).
+        """
         params = {
             "filter": {"ENTITY_TYPE_ID": 4, "ENTITY_ID": company_id},
             "select": list(fieldmaps.REQUISITE.values()),
         }
         rows = [row async for row in self._client.list_all("crm.requisite.list", params)]
-        return [fieldmaps.to_canonical(r, fieldmaps.REQUISITE) for r in rows]
+        canon = [fieldmaps.to_canonical(r, fieldmaps.REQUISITE) for r in rows]
+        return sorted(canon, key=lambda r: not r.get("inn"))
 
     async def get_inn_kpp(self, company_id: int | str) -> dict[str, str | None]:
         """Удобный доступ к ИНН/КПП первого реквизита (нужно пресету b24-sap)."""

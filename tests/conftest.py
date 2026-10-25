@@ -21,6 +21,7 @@ def make_connector(transport: httpx.ASGITransport) -> Bitrix24Connector:
             "price_type_id": 1,
             "rate_limit_rps": 1000.0,
             "event_secret": TEST_EVENT_SECRET,
+            "documents_responsible_id": "1",
         },
         _transport=transport,
     )

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "intelbit-floweon-connector-bitrix24"
 description = "Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон"
-version = "0.3.0"
+version = "0.3.1"
 authors = [{ name = "Святослав Михайлов", email = "vceo@intelbit.ru" }]
 readme = "README.md"
 requires-python = ">=3.12"

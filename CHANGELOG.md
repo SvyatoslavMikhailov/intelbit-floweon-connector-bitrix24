@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-10-25
+
+Расхождения мока с реальной коробкой «Корпоративный портал» 26.800 (BitrixVM, стенд
+4-17-28). Коннектор приведён к коробке, мок — к коннектору и коробке.
+
+### Исправлено
+
+- `catalog.product.list`: коробка требует `id` и `iblockId` в `select` («Required select
+  fields») — upsert по `code` падал на поиске товара. Select по умолчанию — стандартные
+  поля, обязательные добавляются всегда. Поле `xml_id` ↔ `xmlId`.
+- `catalog.price.add/update` отвечают под ключом `price`, а не `element` — id записи
+  берётся из любой обёртки ответа.
+- Остатки: `catalog.storeproduct.add/update` на коробке нет. При складском учёте
+  (`catalog.document.mode.status` = `Y`) upsert `store_product` доводит остаток
+  документом: разница с текущим → оприходование `S` или списание `D`, проведение
+  `conduct`, при сбое непроведённый документ удаляется; без изменений — `noop`. Без
+  учёта — `quantity` товара. Новые ключи конфига: `documents_responsible_id`
+  (обязателен для документов, иначе «Required fields: responsibleId»),
+  `document_currency` (по умолчанию RUB). Заголовок документа — «Фловеон: остаток <code>».
+- Upsert `store_product`: пустой `amount` — ошибка (раньше 0 → документ списания обнулял
+  склад); товар без карточки — `ValueError` с меткой `product_not_found: …` (для
+  `on_error_match` пресета). Откат непроведённого документа — при любом исключении,
+  включая отмену. `select` товара по умолчанию — все поля `fieldmaps.PRODUCT`.
+- Реквизиты: коробка сама создаёт пустой реквизит вместе с компанией — `read requisite`
+  отдаёт реквизиты с ИНН первыми.
+- Нотификатор: v3-чат задачи при вебхуке без scope `tasks`
+  (`…INSUFFICIENTSCOPEEXCEPTION` или `insufficient_scope`; `tasks.task.*` v2 при этом работают со scope `task`)
+  откатывается на форум задачи с причиной в health (`comments_channel=forum (…)`) и предупреждением в лог при первом откате (health наружу не виден).
+
+### Мок
+
+- `catalog.product.list` без `select` — ошибка коробки; `catalog.price.*` → `price`;
+  `catalog.storeproduct.add/update` — ошибка 22002; документы `catalog.document.*`
+  (`create_app(inventory_mode=True)` по умолчанию); `crm.company.add` и e2e-сид — с пустым
+  «автоматическим» реквизитом; `create_app(v3_scope=False)`; `/_fail` для любого метода.
+
 ## [0.3.0] — 2026-10-02
 
 ### Добавлено

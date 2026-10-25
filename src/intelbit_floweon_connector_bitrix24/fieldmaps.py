@@ -50,6 +50,7 @@ PRODUCT: dict[str, str] = {
     "iblock_id": "iblockId",
     "name": "name",
     "code": "code",
+    "xml_id": "xmlId",
     "active": "active",
     "measure": "measure",
     "iblock_section_id": "iblockSectionId",

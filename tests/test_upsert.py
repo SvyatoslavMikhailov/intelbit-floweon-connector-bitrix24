@@ -86,17 +86,43 @@ class TestPriceAndStockUpsert:
             await _connector(ext_transport).write("price", {"code": "999", "price": 1})
 
     async def test_store_product_via_code(self, ext_transport: httpx.ASGITransport) -> None:
-        connector = _connector(ext_transport, store_id="201")
+        connector = _connector(ext_transport, store_id="201", documents_responsible_id="1")
         product = await connector.write("product", {"code": "100", "name": "Болт"})
         added = await connector.write("store_product", {"code": "100", "amount": 170})
         updated = await connector.write("store_product", {"code": "100", "amount": 150})
-        assert added["op"] == "add"
-        assert updated["op"] == "update"
-        rows = (await _state(ext_transport))["storeproducts"]
+        same = await connector.write("store_product", {"code": "100", "amount": 150})
+        # Складской учёт коробки: оприходование, затем списание разницы, затем ничего.
+        assert (added["op"], added["doc_type"], added["code"]) == ("document", "S", "100")
+        assert (updated["doc_type"], updated["delta"]) == ("D", -20)
+        assert same["op"] == "noop"
+        state = await _state(ext_transport)
+        docs = state["documents"]
+        assert [d["title"] for d in docs] == ["Фловеон: остаток 100"] * 2
+        assert all(d["status"] == "Y" for d in docs)
+        rows = state["storeproducts"]
         assert isinstance(rows, list) and len(rows) == 1
         assert str(rows[0]["storeId"]) == "201"
         assert str(rows[0]["productId"]) == str(product["id"])
-        assert str(rows[0]["amount"]) == "150"
+        assert float(rows[0]["amount"]) == 150
+
+    async def test_store_product_unknown_code_marked(
+        self, ext_transport: httpx.ASGITransport
+    ) -> None:
+        """Нет карточки товара — ошибка с меткой product_not_found (для on_error_match)."""
+        connector = _connector(ext_transport, store_id="201", documents_responsible_id="1")
+        with pytest.raises(ValueError, match=r"^product_not_found: "):
+            await connector.write("store_product", {"code": "404", "amount": 1})
+
+    async def test_store_product_without_amount_not_zeroed(
+        self, ext_transport: httpx.ASGITransport
+    ) -> None:
+        """Пустое количество — ошибка, а не списание остатка до нуля."""
+        connector = _connector(ext_transport, store_id="201", documents_responsible_id="1")
+        await connector.write("product", {"code": "100", "name": "Болт"})
+        await connector.write("store_product", {"code": "100", "amount": 5})
+        with pytest.raises(ValueError, match="нет amount"):
+            await connector.write("store_product", {"code": "100", "amount": None})
+        assert [d["docType"] for d in (await _state(ext_transport))["documents"]] == ["S"]
 
     async def test_store_id_required(self, ext_transport: httpx.ASGITransport) -> None:
         connector = _connector(ext_transport)
@@ -115,9 +141,13 @@ class TestExtendedMock:
         company = (await connector.read("company", {"id": 2}))[0]
         assert company["title"] == "ООО Лютик"
         assert company["address_city"] == "Санкт-Петербург"
+        # Пустой «автоматический» реквизит коробки (ID меньше) — после заполненного.
         requisites = await connector.read("requisite", {"company_id": 2})
-        assert [(r["inn"], r["kpp"]) for r in requisites] == [("7702000002", "770201001")]
-        assert await connector.read("requisite", {"company_id": 3}) == []
+        assert [(r["inn"], r["kpp"]) for r in requisites] == [
+            ("7702000002", "770201001"),
+            (None, None),
+        ]
+        assert [r["inn"] for r in await connector.read("requisite", {"company_id": 3})] == [None]
 
     async def test_catalog_empty_store_present(self, ext_transport: httpx.ASGITransport) -> None:
         state = await _state(ext_transport)

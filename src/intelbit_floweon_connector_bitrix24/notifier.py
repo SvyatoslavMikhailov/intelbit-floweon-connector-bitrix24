@@ -6,9 +6,11 @@
 - `create` — `tasks.task.add`: ответственный, группа, дедлайн, теги, привязка к
   карточке CRM (`UF_CRM_TASK`), приоритет для ошибок;
 - `comment` — сообщение в **чат задачи** (REST v3 `tasks.task.chat.message.send`):
-  интерфейс задачи показывает чат, а не форум. Если портал не знает v3-метода —
-  запасной путь `task.comment.add` (форум, в интерфейсе задачи НЕ виден) с пометкой
-  `comments_channel=forum` в health, чтобы администратор об этом знал;
+  интерфейс задачи показывает чат, а не форум. Если портал не знает v3-метода или у
+  вебхука нет scope `tasks` (коробка 4-17-28: `…INSUFFICIENTSCOPEEXCEPTION`, при этом
+  `tasks.task.*` v2 работают и со scope `task`) — запасной путь `task.comment.add`
+  (форум, в интерфейсе задачи НЕ виден) с пометкой `comments_channel=forum` в health,
+  чтобы администратор об этом знал;
 - `send` — `im.message.add` (сводка в чат или пользователю).
 
 `status(external_id)` — открыта ли задача (статусы 2/3/4/6 — в работе, 5/7 — закрыта).
@@ -20,6 +22,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -31,9 +34,11 @@ from intelbit_bitrix24_client import Bitrix24Client, Bitrix24Error, bbcode
 
 from intelbit_floweon_connector_bitrix24.connector import _resolve_tls
 
+logger = logging.getLogger(__name__)
+
 _MANIFEST = PluginManifest(
     id="intelbit.notifier.bitrix24_tasks",
-    version="0.3.0",
+    version="0.3.1",
     plugin_type=PluginType.NOTIFIER,
     name="Bitrix24 Tasks Notifier",
     description="Уведомления Интелбит.Фловеон задачами и сообщениями Bitrix24",
@@ -47,6 +52,7 @@ _MESSAGE_MAX = 4000
 # — открыта; 5 завершена, 7 отклонена — закрыта.
 _OPEN_STATUSES = frozenset({2, 3, 4, 6})
 _METHOD_NOT_FOUND = "ERROR_METHOD_NOT_FOUND"
+_INSUFFICIENT_SCOPE = "INSUFFICIENTSCOPE"
 
 
 def dedup_tag(dedup_key: str) -> str:
@@ -83,6 +89,7 @@ class Bitrix24TasksNotifier(NotifierPlugin):
             _transport=_transport,
         )
         self._comments_channel = "chat"
+        self._forum_reason = ""
 
     async def start(self) -> None:
         """Ресурсов нет: клиент открывает соединение на каждый запрос."""
@@ -96,7 +103,9 @@ class Bitrix24TasksNotifier(NotifierPlugin):
             return PluginHealth(healthy=False, message="webhook_base_url не задан")
         if self._comments_channel == "forum":
             # Комментарии уходят в форум задачи — человек в задаче их не видит.
-            return PluginHealth(healthy=True, message="comments_channel=forum")
+            return PluginHealth(
+                healthy=True, message=f"comments_channel=forum ({self._forum_reason})"
+            )
         return PluginHealth(healthy=True, message="")
 
     # ------------------------------------------------------------------ #
@@ -174,9 +183,20 @@ class Bitrix24TasksNotifier(NotifierPlugin):
             )
             self._comments_channel = "chat"
         except Bitrix24Error as exc:
-            if exc.code != _METHOD_NOT_FOUND:
+            if exc.code == _METHOD_NOT_FOUND:
+                self._forum_reason = "портал без REST v3"
+            elif _INSUFFICIENT_SCOPE in exc.code.upper().replace("_", ""):
+                self._forum_reason = "у вебхука нет scope tasks"
+            else:
                 raise
-            # Портал без REST v3: форум задачи (в интерфейсе не виден) — лучше, чем ничего.
+            # Форум задачи (в интерфейсе не виден) — лучше, чем ничего. health наружу
+            # (readyz, floweon status) это не показывает — поэтому предупреждение в лог.
+            if self._comments_channel != "forum":
+                logger.warning(
+                    "Bitrix24: комментарии к задачам уходят в форум (в интерфейсе задачи не "
+                    "видны): %s",
+                    self._forum_reason,
+                )
             self._comments_channel = "forum"
             await self._client.call(
                 "task.comment.add",

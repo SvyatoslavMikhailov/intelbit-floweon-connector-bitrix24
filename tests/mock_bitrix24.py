@@ -13,6 +13,17 @@ create_app() возвращает СВЕЖЕЕ приложение с пере�
 `/rest/api/<user>/<token>/tasks.task.chat.message.send`. `create_app(v3_enabled=False)` —
 портал без v3 (ERROR_METHOD_NOT_FOUND). Хук `POST /_tasks/{id}/status` {"status": 5} —
 закрыть задачу из теста. `/_state`: tasks, task_chat, task_forum, im_messages.
+
+Приведён к коробке «Корпоративный портал» 26.x (стенд 4-17-28):
+- `catalog.product.list` без `id`/`iblockId` в `select` — ошибка «Required select fields»;
+- `catalog.price.add/update` отвечают под ключом `price`, а не `element`;
+- `catalog.storeproduct.add/update` нет (только list/get); остатки при складском учёте
+  (`create_app(inventory_mode=True)`, по умолчанию) — документами `catalog.document.*`:
+  `S` (оприходование, storeTo) / `D` (списание, storeFrom), остаток меняет `conduct`;
+  без учёта — `quantity` товара в `catalog.product.update`;
+- `create_app(v3_scope=False)` — вебхук без scope `tasks`: v3-чат задачи отвечает
+  `BITRIX_REST_V3_EXCEPTION_INSUFFICIENTSCOPEEXCEPTION`.
+`/_state` дополнительно: documents.
 """
 
 from __future__ import annotations
@@ -148,6 +159,9 @@ def _seed_extended() -> dict[str, Any]:
         4: company(4, "ООО Сбой", "Тула", "300000", "ул. Ленина, 4"),
     }
     db["requisites"] = [
+        # Пустые реквизиты, которые коробка создаёт вместе с компанией (ИНН null),
+        # идут раньше заполненных — как на стенде 4-17-28.
+        *(_empty_requisite(cid, cid) for cid in (1, 2, 3, 4)),
         requisite(11, 1, "7701234567", "770101001", "ООО Ромашка"),
         requisite(12, 2, "7702000002", "770201001", "ООО Лютик"),
         requisite(14, 4, "0000000000", "000001001", "ООО Сбой"),
@@ -157,6 +171,17 @@ def _seed_extended() -> dict[str, Any]:
     db["prices"] = {}
     db["storeproducts"] = {}
     return db
+
+
+def _empty_requisite(rid: int, cid: int) -> dict[str, Any]:
+    return {
+        "ID": str(rid),
+        "ENTITY_ID": str(cid),
+        "ENTITY_TYPE_ID": "4",
+        "PRESET_ID": "1",
+        "RQ_INN": None,
+        "RQ_KPP": None,
+    }
 
 
 def _match(items: Iterable[dict[str, Any]], filter_: Any) -> list[dict[str, Any]]:
@@ -193,13 +218,32 @@ def _task_view(task: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _stock_add(db: dict[str, Any], store_id: int, product_id: int, qty: float) -> None:
+    """Проведение документа: изменить остаток (строка создаётся при первом движении)."""
+    for row in db["storeproducts"].values():
+        if int(row["storeId"]) == store_id and int(row["productId"]) == product_id:
+            row["amount"] = float(row["amount"]) + qty
+            return
+    new_id = (max(db["storeproducts"]) if db["storeproducts"] else 0) + 1
+    db["storeproducts"][new_id] = {
+        "id": new_id,
+        "storeId": store_id,
+        "productId": product_id,
+        "amount": qty,
+        "quantityReserved": None,
+    }
+
+
 def create_app(
     limit_methods: frozenset[str] = frozenset(),
     extended: bool = False,
     v3_enabled: bool = True,
+    v3_scope: bool = True,
+    inventory_mode: bool = True,
 ) -> FastAPI:
     app = FastAPI(title="Bitrix24 Mock", version="0.1.0")
     db = _seed_extended() if extended else _seed()
+    db["documents"] = {}
     db["tasks"] = {}
     db["task_chat"] = []
     db["task_forum"] = []
@@ -224,6 +268,8 @@ def create_app(
         if method == "crm.company.add":
             new_id = _next_id(db["companies"])
             db["companies"][new_id] = {"ID": str(new_id), **fields}
+            # Коробка заводит пустой реквизит пресета «Организация» вместе с компанией.
+            db["requisites"].append(_empty_requisite(len(db["requisites"]) + 100, new_id))
             return {"result": new_id}
         if method == "crm.company.update":
             db["companies"][int(params["id"])].update(fields)
@@ -247,6 +293,10 @@ def create_app(
 
         # --- каталог: товары ------------------------------------------------ #
         if method == "catalog.product.list":
+            select = _listish(params.get("select")) or []
+            missing = [f for f in ("id", "iblockId") if f not in select]
+            if missing:
+                raise _BoxError("0", "Required select fields: " + ", ".join(missing))
             items = _match(db["products"].values(), params.get("filter"))
             page, nxt = _paginate(items, start)
             return _wrapped({"products": page}, len(items), nxt)
@@ -270,10 +320,10 @@ def create_app(
             new_id = _next_id(db["prices"])
             element = {"id": new_id, **fields}
             db["prices"][new_id] = element
-            return {"result": {"element": element}}
+            return {"result": {"price": element}}
         if method == "catalog.price.update":
             db["prices"][int(params["id"])].update(fields)
-            return {"result": {"element": db["prices"][int(params["id"])]}}
+            return {"result": {"price": db["prices"][int(params["id"])]}}
         if method == "catalog.priceType.list":
             return _wrapped({"priceTypes": [{"id": 1, "name": "BASE"}]}, 1, None)
 
@@ -290,14 +340,43 @@ def create_app(
             return _wrapped({"storeProducts": page}, len(items), nxt)
         if method == "catalog.storeproduct.get":
             return {"result": {"storeProduct": db["storeproducts"].get(int(params["id"]), {})}}
-        if method == "catalog.storeproduct.add":
-            new_id = _next_id(db["storeproducts"])
-            element = {"id": new_id, **fields}
-            db["storeproducts"][new_id] = element
-            return {"result": {"element": element}}
-        if method == "catalog.storeproduct.update":
-            db["storeproducts"][int(params["id"])].update(fields)
-            return {"result": {"element": db["storeproducts"][int(params["id"])]}}
+        if method in ("catalog.storeproduct.add", "catalog.storeproduct.update"):
+            action = method.rsplit(".", 1)[1]
+            raise _BoxError(
+                "22002",
+                f"Could not find description of {action} in "
+                "Bitrix\\Catalog\\Controller\\StoreProduct",
+            )
+
+        # --- складской учёт: документы ------------------------------------ #
+        if method == "catalog.document.mode.status":
+            return {"result": "Y" if inventory_mode else "N"}
+        if method == "catalog.document.add":
+            if not fields.get("responsibleId"):
+                raise _BoxError("0", "Required fields: responsibleId")
+            new_id = _next_id(db["documents"])
+            doc = {"id": new_id, "status": "N", "elements": [], **fields}
+            db["documents"][new_id] = doc
+            return {"result": {"document": {k: v for k, v in doc.items() if k != "elements"}}}
+        if method == "catalog.document.element.add":
+            doc = db["documents"][int(fields["docId"])]
+            if doc["status"] != "N":
+                raise _BoxError("0", "Документ уже проведён")
+            doc["elements"].append(fields)
+            return {"result": {"documentElement": {"id": len(doc["elements"]), **fields}}}
+        if method in ("catalog.document.conduct", "catalog.document.cancel"):
+            doc = db["documents"][int(params["id"])]
+            sign = 1 if method.endswith("conduct") else -1
+            for el in doc["elements"]:
+                store = int(el.get("storeTo") or el.get("storeFrom"))
+                qty = float(el["amount"]) * (1 if doc["docType"] == "S" else -1) * sign
+                _stock_add(db, store, int(el["elementId"]), qty)
+            doc["status"] = "Y" if sign == 1 else "C"
+            return {"result": True}
+        if method == "catalog.document.deleteList":
+            for doc_id in _listish(params.get("documentIds")) or []:
+                db["documents"].pop(int(doc_id), None)
+            return {"result": True}
 
         # --- сделки --------------------------------------------------------- #
         if method == "crm.deal.list":
@@ -372,6 +451,16 @@ def create_app(
                 status_code=404,
                 content={"error": "ERROR_METHOD_NOT_FOUND", "error_description": method},
             )
+        if not v3_scope:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error": {
+                        "code": "BITRIX_REST_V3_EXCEPTION_INSUFFICIENTSCOPEEXCEPTION",
+                        "message": "Недостаточно прав доступа: отсутствует необходимый scope.",
+                    }
+                },
+            )
         body = await request.json()
         fields = body.get("fields") or {}
         task_id = int(fields.get("taskId") or 0)
@@ -439,6 +528,12 @@ def create_app(
         if method == "batch":
             return JSONResponse(_run_batch(params, _dispatch))
 
+        # /_fail для прочих методов (у tasks.task.add — своя логика after_store).
+        fail = failures.get(method)
+        if method != "tasks.task.add" and fail and fail["times"] > 0:
+            fail["times"] -= 1
+            return HTMLResponse("<html><body>502 Bad Gateway</body></html>", status_code=502)
+
         try:
             return JSONResponse(_dispatch(method, params))
         except _GatewayError:
@@ -448,12 +543,26 @@ def create_app(
                 status_code=400,
                 content={"error": "ERROR_METHOD_NOT_FOUND", "error_description": str(exc)},
             )
+        except _BoxError as exc:
+            return JSONResponse(
+                status_code=400,
+                content={"error": exc.code, "error_description": exc.description},
+            )
 
     return app
 
 
 class _MethodError(RuntimeError):
     pass
+
+
+class _BoxError(RuntimeError):
+    """Ошибка метода в конверте коробки `{"error": код, "error_description": …}`."""
+
+    def __init__(self, code: str, description: str) -> None:
+        super().__init__(description)
+        self.code = code
+        self.description = description
 
 
 class _GatewayError(RuntimeError):
@@ -488,7 +597,7 @@ def _run_batch(
         sub_params = _unflatten(parse_qsl(query))
         try:
             env = dispatch(method, sub_params)
-        except _MethodError as exc:
+        except (_MethodError, _BoxError) as exc:
             result_error[name] = str(exc)
             continue
         result[name] = env.get("result")

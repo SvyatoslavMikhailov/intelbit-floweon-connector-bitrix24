@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
+from intelbit_bitrix24_client import Bitrix24Client, Bitrix24Error
 
 from intelbit_floweon_connector_bitrix24 import Bitrix24Connector
+from tests.conftest import MOCK_BASE
 
 pytestmark = pytest.mark.contract
 
@@ -63,3 +66,26 @@ async def test_price_update(connector: Bitrix24Connector) -> None:
 async def test_price_types(connector: Bitrix24Connector) -> None:
     types = await connector.catalog.price_types()
     assert types[0]["name"] == "BASE"
+
+
+async def test_product_list_select_always_has_required(connector: Bitrix24Connector) -> None:
+    """Коробка требует id и iblockId в select (стенд 4-17-28) — коннектор добавляет их сам."""
+    rows = await connector.read("product", {"select": ["name"]})
+    assert rows and {"id", "iblock_id", "name"} <= set(rows[0])
+
+
+async def test_product_list_without_select_fails_on_box(transport: httpx.ASGITransport) -> None:
+    """Мок повторяет коробку: list без select — ошибка «Required select fields»."""
+    client = Bitrix24Client(MOCK_BASE, rps=1000.0, _transport=transport)
+    with pytest.raises(Bitrix24Error, match="Required select fields: id, iblockId"):
+        await client.call("catalog.product.list", {"filter": {"iblockId": 14}})
+
+
+async def test_price_add_returns_id_from_price_key(transport: httpx.ASGITransport) -> None:
+    """catalog.price.add отвечает {price: {...}}, а не {element: {...}}."""
+    client = Bitrix24Client(MOCK_BASE, rps=1000.0, _transport=transport)
+    env = await client.call(
+        "catalog.price.add",
+        {"fields": {"productId": 102, "catalogGroupId": 1, "price": 3, "currency": "RUB"}},
+    )
+    assert set(env["result"]) == {"price"}

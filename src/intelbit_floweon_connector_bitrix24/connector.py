@@ -29,12 +29,13 @@ from intelbit_floweon_connector_bitrix24.webhooks import (
 )
 
 _UPSERT_ENTITIES = frozenset({"product", "price", "store_product"})
+PRODUCT_NOT_FOUND = "product_not_found"
 
 logger = logging.getLogger(__name__)
 
 _MANIFEST = PluginManifest(
     id="intelbit.floweon.connector.bitrix24",
-    version="0.3.0",
+    version="0.3.1",
     plugin_type=PluginType.CONNECTOR,
     name="Bitrix24 Connector",
     description="Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон",
@@ -111,7 +112,12 @@ class Bitrix24Connector(ConnectorPlugin):
             iblock_id=cfg.get("iblock_id"),
             price_type_id=cfg.get("price_type_id"),
         )
-        self.stock = StockDomain(self._client)
+        responsible = str(cfg.get("documents_responsible_id") or "").strip()
+        self.stock = StockDomain(
+            self._client,
+            document_currency=str(cfg.get("document_currency") or "RUB"),
+            documents_responsible_id=int(responsible) if responsible else None,
+        )
         self.deals = DealsDomain(self._client)
         self.webhooks = Bitrix24WebhookReceiver(cfg.get("event_secret"))
 
@@ -250,22 +256,25 @@ class Bitrix24Connector(ConnectorPlugin):
             raise ValueError(
                 "upsert store_product: в конфиге коннектора не задан store_id (склад остатков)"
             )
-        store = int(store_id)
-        rows = await self.stock.list_stock(store, product_id)
-        amount = record.get("amount")
-        if rows:
-            row_id = int(rows[0]["id"])
-            await self.stock.update_stock(row_id, {"amount": amount})
-            return {"id": row_id, "op": "update", "code": code}
-        new_id = await self.stock.add_stock(
-            {"store_id": store, "product_id": product_id, "amount": amount}
+        if record.get("amount") in (None, ""):
+            # Пустое количество — не «ноль»: иначе документ списания обнулил бы склад.
+            raise ValueError(f"upsert store_product: нет amount у товара {code!r}")
+        result = await self.stock.set_amount(
+            int(store_id),
+            product_id,
+            float(record["amount"]),
+            title=f"Фловеон: остаток {code}",
         )
-        return {"id": new_id, "op": "add", "code": code}
+        return {**result, "code": code}
 
     async def _product_id_by_code(self, code: str) -> int:
         products = await self.catalog.list_records({"code": code})
         if not products:
-            raise ValueError(f"товар с code {code!r} не найден в каталоге Bitrix24")
+            # Метка product_not_found — для on_error_match пресета: ветка ошибки данных
+            # ловит только её, прочие ошибки — сбой шага.
+            raise ValueError(
+                f"{PRODUCT_NOT_FOUND}: товар с code {code!r} не найден в каталоге Bitrix24"
+            )
         return int(products[0]["id"])
 
     # --- helpers ---------------------------------------------------------- #

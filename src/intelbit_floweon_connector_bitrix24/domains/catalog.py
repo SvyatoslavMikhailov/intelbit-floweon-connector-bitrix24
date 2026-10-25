@@ -2,7 +2,11 @@
 
 Методы `catalog.*` оборачивают результат в объект: список — под ключом
 множественного числа (`products`/`prices`), одиночная запись — под ключом
-единственного (`product`/`price`), запись add/update — под `element`.
+единственного (`product`/`price`). Запись add/update товара коробка отдаёт под
+`element`, а цены — под `price` (стенд 4-17-28), поэтому id берётся из любой обёртки.
+
+`catalog.product.list` на коробке требует `select` с `id` и `iblockId` (иначе ошибка
+«Required select fields»), select по умолчанию — стандартные поля товара.
 """
 
 from __future__ import annotations
@@ -13,11 +17,23 @@ from intelbit_bitrix24_client import Bitrix24Client
 
 from intelbit_floweon_connector_bitrix24 import fieldmaps
 
+# Поля, без которых catalog.product.list на коробке отвечает ошибкой.
+_REQUIRED_SELECT = ("id", "iblockId")
+# Без select коробка не отвечает — по умолчанию все стандартные поля fieldmaps.PRODUCT.
+_DEFAULT_SELECT = list(fieldmaps.PRODUCT.values())
+
 
 def _element_id(env: dict[str, Any]) -> int:
+    """id записи из ответа add/update: `{element: …}`, `{price: …}` или запись как есть."""
     result = env.get("result", {})
-    element = result.get("element", result) if isinstance(result, dict) else {}
-    return int(element["id"])
+    if not isinstance(result, dict):
+        raise ValueError(f"Bitrix24: неожиданный ответ записи: {result!r}")
+    if "id" in result:
+        return int(result["id"])
+    wrapped = next((v for v in result.values() if isinstance(v, dict) and "id" in v), None)
+    if wrapped is None:
+        raise ValueError(f"Bitrix24: в ответе записи нет id: {list(result)}")
+    return int(wrapped["id"])
 
 
 class CatalogDomain:
@@ -44,9 +60,9 @@ class CatalogDomain:
         b24_filter = fieldmaps.to_bitrix(filter or {}, fieldmaps.PRODUCT)
         if self._iblock_id is not None and "iblockId" not in b24_filter:
             b24_filter["iblockId"] = self._iblock_id
-        params: dict[str, Any] = {"filter": b24_filter}
-        if select:
-            params["select"] = select
+        fields = list(select) if select else list(_DEFAULT_SELECT)
+        fields += [f for f in _REQUIRED_SELECT if f not in fields]
+        params: dict[str, Any] = {"filter": b24_filter, "select": fields}
         rows = [
             row
             async for row in self._client.list_all(
