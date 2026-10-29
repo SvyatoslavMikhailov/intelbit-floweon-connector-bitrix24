@@ -44,6 +44,29 @@ REQUISITE: dict[str, str] = {
     "company_name": "RQ_COMPANY_NAME",
 }
 
+# --- CRM: лиды (crm.lead.*) ----------------------------------------------- #
+LEAD: dict[str, str] = {
+    "id": "ID",
+    "title": "TITLE",
+    "status_id": "STATUS_ID",
+    "status_semantic_id": "STATUS_SEMANTIC_ID",
+    "company_id": "COMPANY_ID",
+    "contact_id": "CONTACT_ID",
+    "assigned_by_id": "ASSIGNED_BY_ID",
+}
+
+# --- CRM: банковские реквизиты (crm.requisite.bankdetail.*) ----------------- #
+BANK_DETAIL: dict[str, str] = {
+    "id": "ID",
+    "requisite_id": "ENTITY_ID",
+    "name": "NAME",
+    "bik": "RQ_BIK",
+    "account": "RQ_ACC_NUM",
+    "corr_account": "RQ_COR_ACC_NUM",
+    "bank_name": "RQ_BANK_NAME",
+    "country_id": "COUNTRY_ID",
+}
+
 # --- Торговый каталог: товары (catalog.product.*) — новый camelCase-API ----- #
 PRODUCT: dict[str, str] = {
     "id": "id",

@@ -53,8 +53,8 @@ class TestProductUpsert:
         second = await connector.write("product", {"code": "100", "name": "Болт М6"})
         assert second == {"id": first["id"], "op": "update", "code": "100"}
 
-        products = (await _state(ext_transport))["products"]
-        assert isinstance(products, list) and len(products) == 1
+        products = [p for p in (await _state(ext_transport))["products"] if p.get("code") == "100"]
+        assert len(products) == 1
         product = products[0]
         assert product["name"] == "Болт М6"
         assert product["code"] == "100"
@@ -149,9 +149,13 @@ class TestExtendedMock:
         ]
         assert [r["inn"] for r in await connector.read("requisite", {"company_id": 3})] == [None]
 
-    async def test_catalog_empty_store_present(self, ext_transport: httpx.ASGITransport) -> None:
+    async def test_catalog_ref_products_store_present(
+        self, ext_transport: httpx.ASGITransport
+    ) -> None:
         state = await _state(ext_transport)
-        assert state["products"] == []
+        # 4-17-30: товары с REF (свойство 61) без кода; каталог по code пуст.
+        assert [p["id"] for p in state["products"]] == [601, 602, 603, 604]
+        assert all("code" not in p for p in state["products"])
         assert [s["id"] for s in state["stores"]] == [201]  # type: ignore[union-attr]
 
     async def test_product_list_filter(self, transport: httpx.ASGITransport) -> None:

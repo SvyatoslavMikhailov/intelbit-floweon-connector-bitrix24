@@ -19,10 +19,16 @@ capabilities:
 entities:
   - company
   - requisite
+  - bank_detail
+  - lead
+  - subject
   - product
+  - product_property_sync
+  - product_by_property
   - price
   - store
   - store_product
+  - store_product_sync
   - deal
   - deal_productrows
 config_schema_path: ../config_schema.json

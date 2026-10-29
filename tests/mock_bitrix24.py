@@ -166,11 +166,86 @@ def _seed_extended() -> dict[str, Any]:
         requisite(12, 2, "7702000002", "770201001", "ООО Лютик"),
         requisite(14, 4, "0000000000", "000001001", "ООО Сбой"),
     ]
-    # Каталог создаёт синхронизация пресета; склад остатков 201 есть.
-    db["products"] = {}
+    # 4-17-30: компания без ИНН, банковские реквизиты, лиды, товары с REF.
+    db["companies"][5] = company(5, "ООО Без ИНН", "Тверь", "170000", "ул. Советская, 5")
+    db["requisites"].append(_empty_requisite(5, 5))
+    db["bankdetails"] = [
+        _bank(21, 11, "044525225", "40702810400000000001", "ПАО Сбербанк"),
+        _bank(22, 11, "044525593", "40702810500000000002", "АО Альфа-Банк"),
+        _bank(23, 12, "044030653", "40702810600000000003", "ПАО Сбербанк СПб"),
+    ]
+    db["leads"] = {
+        501: _lead(501, "NEW", 1),
+        502: _lead(502, "CONVERTED", 2),
+        503: _lead(503, "CONVERTED", 1),
+        504: _lead(504, "CONVERTED", 5),
+        505: _lead(505, "CONVERTED", 0),
+        506: _lead(506, "CONVERTED", 4),  # SAP отклоняет ИНН 0000000000
+        507: _lead(507, "CONVERTED", 2),  # второй успешный лид той же компании
+    }
+    # Каталог: товары с REF (свойство 61) и «текущим материалом» (62). R-300 нет в SAP,
+    # 604 — товар без REF (услуга), 605 — REF есть, текущего материала нет (остатки).
+    db["products"] = {
+        601: _product(601, "Зонд А", "R-100"),
+        602: _product(602, "Зонд Б", "R-200"),
+        603: _product(603, "Зонд В", "R-300"),
+        604: _product(604, "Монтаж", None),
+    }
     db["prices"] = {}
     db["storeproducts"] = {}
     return db
+
+
+# Стадии лидов: семантика — как в crm.status.list коробки (SEMANTICS S/F, пусто — в работе).
+_LEAD_STATUSES = [
+    {"STATUS_ID": "NEW", "ENTITY_ID": "STATUS", "NAME": "Новый", "SEMANTICS": None},
+    {"STATUS_ID": "IN_PROCESS", "ENTITY_ID": "STATUS", "NAME": "В работе", "SEMANTICS": None},
+    {"STATUS_ID": "CONVERTED", "ENTITY_ID": "STATUS", "NAME": "Качественный", "SEMANTICS": "S"},
+    {"STATUS_ID": "JUNK", "ENTITY_ID": "STATUS", "NAME": "Некачественный", "SEMANTICS": "F"},
+]
+REF_PROPERTY = "property61"
+CURMAT_PROPERTY = "property62"
+
+
+def _lead(lid: int, status: str, company_id: int) -> dict[str, Any]:
+    return {
+        "ID": str(lid),
+        "TITLE": f"Лид {lid}",
+        "STATUS_ID": status,
+        "COMPANY_ID": str(company_id),
+    }
+
+
+def _bank(bid: int, rid: int, bik: str, account: str, bank: str) -> dict[str, Any]:
+    return {
+        "ID": str(bid),
+        "ENTITY_ID": str(rid),
+        "NAME": bank,
+        "RQ_BIK": bik,
+        "RQ_ACC_NUM": account,
+        "RQ_COR_ACC_NUM": "30101810400000000225",
+        "RQ_BANK_NAME": bank,
+        "COUNTRY_ID": "1",
+    }
+
+
+def _product(pid: int, name: str, ref: str | None) -> dict[str, Any]:
+    return {
+        "id": pid,
+        "iblockId": 14,
+        "name": name,
+        REF_PROPERTY: {"valueId": pid * 10, "value": ref} if ref else None,
+        CURMAT_PROPERTY: None,
+    }
+
+
+def _property_write(old: Any, value: Any, new_value_id: int) -> Any:
+    """Запись свойства как в коробке: объект {value[, valueId]} — значение; строка или
+    иной формат молча обнуляют свойство (ответ всё равно успешный)."""
+    if not isinstance(value, dict) or "value" not in value:
+        return None
+    value_id = value.get("valueId") or (old or {}).get("valueId") or new_value_id
+    return {"valueId": int(value_id), "value": value["value"]}
 
 
 def _empty_requisite(rid: int, cid: int) -> dict[str, Any]:
@@ -185,13 +260,19 @@ def _empty_requisite(rid: int, cid: int) -> dict[str, Any]:
 
 
 def _match(items: Iterable[dict[str, Any]], filter_: Any) -> list[dict[str, Any]]:
-    """Точное совпадение по ключам filter (сравнение строкой: form передаёт строки)."""
+    """Точное совпадение по ключам filter (сравнение строкой: form передаёт строки).
+
+    Свойство товара (`propertyNN`) сравнивается по его значению `value`."""
     if not isinstance(filter_, dict) or not filter_:
         return list(items)
+
+    def plain(value: Any) -> Any:
+        return value.get("value") if isinstance(value, dict) else value
+
     return [
         item
         for item in items
-        if all(str(item.get(key)) == str(value) for key, value in filter_.items())
+        if all(str(plain(item.get(key))) == str(value) for key, value in filter_.items())
     ]
 
 
@@ -289,7 +370,45 @@ def create_app(
             db["requisites"].append({"ID": str(new_id), **fields})
             return {"result": new_id}
         if method == "crm.requisite.update":
+            for row in db["requisites"]:
+                if row["ID"] == str(params["id"]):
+                    row.update(fields)
             return {"result": True}
+        if method == "crm.requisite.get":
+            found = [r for r in db["requisites"] if r["ID"] == str(params["id"])]
+            if not found:
+                raise _BoxError("NOT_FOUND", "Not found")
+            return {"result": found[0]}
+
+        # --- банковские реквизиты, лиды, стадии (4-17-30) -------------------- #
+        if method == "crm.requisite.bankdetail.list":
+            entity_id = str(params.get("filter", {}).get("ENTITY_ID", ""))
+            items = [
+                b for b in db.get("bankdetails", []) if not entity_id or b["ENTITY_ID"] == entity_id
+            ]
+            page, nxt = _paginate(items, start)
+            return _envelope(page, len(items), nxt)
+        if method == "crm.requisite.bankdetail.get":
+            found = [b for b in db.get("bankdetails", []) if b["ID"] == str(params["id"])]
+            if not found:
+                raise _BoxError("NOT_FOUND", "Not found")
+            return {"result": found[0]}
+        if method == "crm.requisite.bankdetail.add":
+            new_id = 100 + len(db.setdefault("bankdetails", []))
+            db["bankdetails"].append({"ID": str(new_id), **fields})
+            return {"result": new_id}
+        if method == "crm.lead.get":
+            lead = db.get("leads", {}).get(int(params["id"]))
+            if lead is None:
+                raise _BoxError("NOT_FOUND", "Not found")
+            return {"result": lead}
+        if method == "crm.lead.update":
+            db["leads"][int(params["id"])].update(fields)
+            return {"result": True}
+        if method == "crm.status.list":
+            entity = str(params.get("filter", {}).get("ENTITY_ID", ""))
+            items = [r for r in _LEAD_STATUSES if not entity or r["ENTITY_ID"] == entity]
+            return _envelope(items, len(items), None)
 
         # --- каталог: товары ------------------------------------------------ #
         if method == "catalog.product.list":
@@ -299,16 +418,26 @@ def create_app(
                 raise _BoxError("0", "Required select fields: " + ", ".join(missing))
             items = _match(db["products"].values(), params.get("filter"))
             page, nxt = _paginate(items, start)
+            # Как в коробке: только поля select (свойства — объектом {valueId, value}).
+            page = [{k: v for k, v in p.items() if k in select} for p in page]
             return _wrapped({"products": page}, len(items), nxt)
         if method == "catalog.product.get":
             return {"result": {"product": db["products"].get(int(params["id"]), {})}}
         if method == "catalog.product.add":
             new_id = _next_id(db["products"])
+            fields = {
+                k: _property_write(None, v, new_id * 10) if k.startswith("property") else v
+                for k, v in fields.items()
+            }
             element = {"id": new_id, **fields}
             db["products"][new_id] = element
             return {"result": {"element": element}}
         if method == "catalog.product.update":
-            db["products"][int(params["id"])].update(fields)
+            product = db["products"][int(params["id"])]
+            for key, value in fields.items():
+                if key.startswith("property"):
+                    value = _property_write(product.get(key), value, int(params["id"]) * 10)
+                product[key] = value
             return {"result": {"element": db["products"][int(params["id"])]}}
 
         # --- каталог: цены -------------------------------------------------- #

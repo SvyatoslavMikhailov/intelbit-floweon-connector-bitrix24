@@ -22,6 +22,8 @@ from intelbit_bitrix24_client import Bitrix24Client
 from intelbit_floweon_connector_bitrix24.domains.catalog import CatalogDomain
 from intelbit_floweon_connector_bitrix24.domains.companies import CompaniesDomain
 from intelbit_floweon_connector_bitrix24.domains.deals import DealsDomain
+from intelbit_floweon_connector_bitrix24.domains.leads import LeadsDomain
+from intelbit_floweon_connector_bitrix24.domains.properties import ProductProperties
 from intelbit_floweon_connector_bitrix24.domains.stock import StockDomain
 from intelbit_floweon_connector_bitrix24.webhooks import (
     Bitrix24WebhookReceiver,
@@ -29,13 +31,17 @@ from intelbit_floweon_connector_bitrix24.webhooks import (
 )
 
 _UPSERT_ENTITIES = frozenset({"product", "price", "store_product"})
+# Пакетные операции над товарами по значению свойства (4-17-30).
+_PROPERTY_ENTITIES = frozenset(
+    {"product_property_sync", "store_product_sync", "product_by_property"}
+)
 PRODUCT_NOT_FOUND = "product_not_found"
 
 logger = logging.getLogger(__name__)
 
 _MANIFEST = PluginManifest(
     id="intelbit.floweon.connector.bitrix24",
-    version="0.3.1",
+    version="0.4.0",
     plugin_type=PluginType.CONNECTOR,
     name="Bitrix24 Connector",
     description="Коннектор Bitrix24 (CRM + Торговый каталог) для Интелбит.Фловеон",
@@ -119,6 +125,10 @@ class Bitrix24Connector(ConnectorPlugin):
             documents_responsible_id=int(responsible) if responsible else None,
         )
         self.deals = DealsDomain(self._client)
+        self.leads = LeadsDomain(self._client)
+        self.properties = ProductProperties(
+            self.catalog, self.stock, dict(cfg.get("product_properties") or {})
+        )
         self.webhooks = Bitrix24WebhookReceiver(cfg.get("event_secret"))
 
     # --- lifecycle (ADR-006) --------------------------------------------- #
@@ -155,6 +165,12 @@ class Bitrix24Connector(ConnectorPlugin):
             return await self.companies.list_records(filter_, select)
         if entity == "requisite":
             return await self.companies.list_requisites(params["company_id"])
+        if entity == "bank_detail":
+            return await self.companies.list_bank_details(params["company_id"])
+        if entity == "lead":
+            return [await self.leads.get(str(entity_id or ""))]
+        if entity == "subject":
+            return [await self._subject(str(params.get("entity", "")), params.get("entity_id"))]
         if entity == "product":
             if entity_id is not None:
                 return [await self.catalog.get(entity_id)]
@@ -186,6 +202,8 @@ class Bitrix24Connector(ConnectorPlugin):
         """
         if "fields" not in data and "op" not in data and entity in _UPSERT_ENTITIES:
             return await self._upsert(entity, data)
+        if entity in _PROPERTY_ENTITIES:
+            return await self._by_property(entity, data)
         op = data.get("op", "add")
         fields = data.get("fields", {})
         entity_id: Any = data.get("id")
@@ -221,6 +239,67 @@ class Bitrix24Connector(ConnectorPlugin):
     async def subscribe(self, headers: dict[str, str], body: bytes) -> dict[str, Any]:
         """Приём исходящего вебхука коробки → канонический Event с idempotency-key."""
         return self.webhooks.parse_event(body)
+
+    # --- субъект события и товары по свойству (4-17-30) ------------------ #
+
+    async def _subject(self, entity: str, entity_id: Any) -> dict[str, Any]:
+        """Карточка CRM, к которой относится событие: компания (или лид без компании).
+
+        Событие лида, реквизита или банковского реквизита сводится к компании; для лида
+        добавляется семантика стадии. Сущность не найдена/не компании → company_id пуст.
+        """
+        entity_id = str(entity_id or "")
+        result: dict[str, Any] = {"source": entity, "company_id": "", "lead_id": ""}
+        if entity == "lead":
+            lead = await self.leads.get(entity_id)
+            result.update(
+                lead_id=entity_id,
+                lead_semantics=lead["status_semantics"],
+                company_id=lead["company_id"],
+            )
+        elif entity == "company":
+            result["company_id"] = entity_id
+        elif entity == "requisite":
+            result["company_id"] = await self.companies.requisite_company_id(entity_id)
+        elif entity == "bankdetail":
+            result["company_id"] = await self.companies.bank_detail_company_id(entity_id)
+        else:
+            raise ValueError(f"subject: неизвестная сущность события {entity!r}")
+        if result["company_id"]:
+            result.update(entity="company", entity_id=result["company_id"])
+        else:
+            result.update(entity=entity, entity_id=entity_id)
+        return result
+
+    async def _by_property(self, entity: str, data: dict[str, Any]) -> dict[str, Any]:
+        if entity == "product_property_sync":
+            return await self.properties.sync(
+                str(data["key_property"]),
+                str(data["value_property"]),
+                list(data.get("items") or []),
+                str(data.get("key_field", "key")),
+                str(data.get("value_field", "value")),
+                int(data.get("sample_size", 20)),
+            )
+        if entity == "store_product_sync":
+            store_id = self.config.get("store_id")
+            if store_id is None or store_id == "":
+                raise ValueError(
+                    "store_product_sync: в конфиге коннектора не задан store_id (склад остатков)"
+                )
+            return await self.properties.sync_stock(
+                str(data["key_property"]),
+                list(data.get("items") or []),
+                int(store_id),
+                data.get("scope_property") or None,
+            )
+        # product_by_property
+        return await self.properties.upsert(
+            str(data["key_property"]),
+            str(data.get("key") or ""),
+            str(data.get("name") or ""),
+            dict(data.get("properties") or {}),
+        )
 
     # --- upsert по code (пресет b24-sap, 4-17-25) ------------------------- #
 

@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 _MANIFEST = PluginManifest(
     id="intelbit.notifier.bitrix24_tasks",
-    version="0.3.1",
+    version="0.4.0",
     plugin_type=PluginType.NOTIFIER,
     name="Bitrix24 Tasks Notifier",
     description="Уведомления Интелбит.Фловеон задачами и сообщениями Bitrix24",

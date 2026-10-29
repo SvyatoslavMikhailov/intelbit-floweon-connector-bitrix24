@@ -6,7 +6,7 @@
     &auth[application_token]=TOKEN&auth[domain]=portal.bitrix24.ru
 
 Каталог/остатки надёжных событий не имеют → синхронизация pull (по расписанию
-в пресете). Здесь — только company/deal/contact.
+в пресете). Здесь — company/deal/contact/lead и реквизиты (requisite, bankdetail).
 """
 
 from __future__ import annotations
@@ -23,6 +23,12 @@ _EVENT_MAP: dict[str, tuple[str, str]] = {
     "ONCRMDEALADD": ("deal", "add"),
     "ONCRMDEALUPDATE": ("deal", "update"),
     "ONCRMDEALDELETE": ("deal", "delete"),
+    "ONCRMLEADADD": ("lead", "add"),
+    "ONCRMLEADUPDATE": ("lead", "update"),
+    "ONCRMREQUISITEADD": ("requisite", "add"),
+    "ONCRMREQUISITEUPDATE": ("requisite", "update"),
+    "ONCRMBANKDETAILADD": ("bankdetail", "add"),
+    "ONCRMBANKDETAILUPDATE": ("bankdetail", "update"),
     "ONCRMCONTACTADD": ("contact", "add"),
     "ONCRMCONTACTUPDATE": ("contact", "update"),
 }

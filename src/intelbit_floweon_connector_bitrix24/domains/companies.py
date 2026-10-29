@@ -8,6 +8,9 @@ from intelbit_bitrix24_client import Bitrix24Client
 
 from intelbit_floweon_connector_bitrix24 import fieldmaps
 
+# ENTITY_TYPE_ID компании в CRM (реквизиты бывают и у контактов — 3).
+_COMPANY_TYPE_ID = "4"
+
 
 class CompaniesDomain:
     """Контрагенты Bitrix24 со стандартными полями + реквизиты для дедупа по ИНН/КПП."""
@@ -82,3 +85,37 @@ class CompaniesDomain:
             "crm.requisite.update", {"id": requisite_id, "fields": fields}
         )
         return bool(env.get("result"))
+
+    # --- банковские реквизиты и владелец реквизита (4-17-30) --------------- #
+
+    async def requisite_company_id(self, requisite_id: int | str) -> str:
+        """ID компании реквизита; реквизит контакта/удалённый → пусто."""
+        env = await self._client.call("crm.requisite.get", {"id": requisite_id})
+        raw = env.get("result") or {}
+        if str(raw.get("ENTITY_TYPE_ID")) != _COMPANY_TYPE_ID:
+            return ""
+        return str(raw.get("ENTITY_ID") or "")
+
+    async def bank_detail_company_id(self, bank_detail_id: int | str) -> str:
+        """ID компании банковского реквизита (банковский реквизит → реквизит → компания)."""
+        env = await self._client.call("crm.requisite.bankdetail.get", {"id": bank_detail_id})
+        requisite_id = (env.get("result") or {}).get("ENTITY_ID")
+        return await self.requisite_company_id(requisite_id) if requisite_id else ""
+
+    async def list_bank_details(self, company_id: int | str) -> list[dict[str, Any]]:
+        """Банковские реквизиты реквизита компании с ИНН (по ID: первый — основной).
+
+        Берётся тот же реквизит, что и для ИНН/КПП (`list_requisites` — с ИНН первым);
+        счета без номера не передаются.
+        """
+        requisites = await self.list_requisites(company_id)
+        if not requisites or not requisites[0].get("id"):
+            return []
+        params = {
+            "filter": {"ENTITY_ID": requisites[0]["id"]},
+            "order": {"ID": "ASC"},
+            "select": list(fieldmaps.BANK_DETAIL.values()),
+        }
+        rows = [row async for row in self._client.list_all("crm.requisite.bankdetail.list", params)]
+        canon = [fieldmaps.to_canonical(r, fieldmaps.BANK_DETAIL) for r in rows]
+        return [b for b in canon if str(b.get("account") or "").strip()]

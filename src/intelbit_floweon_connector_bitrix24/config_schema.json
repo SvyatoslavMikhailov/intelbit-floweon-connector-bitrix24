@@ -65,6 +65,13 @@
       ],
       "default": false,
       "description": "Разрешить verify_ssl=false (LAN-стенд с самоподписанным сертификатом)"
+    },
+    "product_properties": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Псевдоним свойства товара пресета → код свойства инфоблока (PROPERTY_61, property61, 61); пустой код — свойство не задано"
     }
   }
 }
