@@ -39,7 +39,7 @@ class ConfigurationError(ValueError):
 
 
 class WebhookValidationError(RuntimeError):
-    """Исходящий вебхук не прошёл проверку (неизвестное событие или secret)."""
+    """Исходящий вебхук не прошёл проверку secret (application_token)."""
 
 
 def _unflatten(pairs: list[tuple[str, str]]) -> dict[str, Any]:
@@ -74,10 +74,13 @@ class Bitrix24WebhookReceiver:
         parsed = _unflatten(parse_qsl(body.decode("utf-8")))
 
         event_name = str(parsed.get("event", "")).upper()
-        if event_name not in _EVENT_MAP:
-            raise WebhookValidationError(f"Неизвестное событие Bitrix24: {event_name!r}")
-
         self._verify_secret(parsed)
+        if event_name not in _EVENT_MAP:
+            # Подлинное, но не поддерживаемое событие (админ добавил в вебхук лишнее, напр.
+            # ONCRMLEADDELETE): 4xx коробка повторяет, а очередь модуля intelbit.floweon
+            # досылает строго по порядку — один отказ остановил бы все события за ним.
+            # Шина отвечает 200 и событие не публикует.
+            return {"ignored": True, "event": event_name}
 
         entity, action = _EVENT_MAP[event_name]
         data = parsed.get("data")

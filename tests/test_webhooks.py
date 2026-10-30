@@ -44,10 +44,19 @@ def test_idempotency_key_is_stable() -> None:
     assert a["idempotency_key"] == b["idempotency_key"]
 
 
-def test_unknown_event_rejected() -> None:
+def test_unknown_event_with_valid_token_ignored() -> None:
     receiver = Bitrix24WebhookReceiver("out-token")
-    with pytest.raises(WebhookValidationError, match="Неизвестное событие"):
-        receiver.parse_event(_body("ONSOMETHINGWEIRD", "1"))
+    assert receiver.parse_event(_body("ONCRMLEADDELETE", "1")) == {
+        "ignored": True,
+        "event": "ONCRMLEADDELETE",
+    }
+
+
+def test_unknown_event_with_bad_token_rejected() -> None:
+    # Токен проверяется до имени события: чужой POST не отличит «игнор» от отказа.
+    receiver = Bitrix24WebhookReceiver("out-token")
+    with pytest.raises(WebhookValidationError, match="application_token"):
+        receiver.parse_event(_body("ONSOMETHINGWEIRD", "1", token="wrong"))
 
 
 def test_bad_secret_rejected() -> None:
