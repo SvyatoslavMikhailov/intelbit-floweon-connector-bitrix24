@@ -86,5 +86,5 @@ uv run pytest
 ```
 
 CI (`.github/workflows/ci.yml`) ставит зависимости из публичных git-тегов
-(`intelbit-bitrix24-client` v0.1.0, `intelbit-floweon-sdk` v0.2.0) и гоняет
+(`intelbit-bitrix24-client` v0.3.0, `intelbit-floweon-sdk` v0.3.1) и гоняет
 ruff + mypy(strict) + pytest.
