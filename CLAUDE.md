@@ -50,8 +50,8 @@ uv run pytest          # -m contract для contract-тестов
 
 ## Зависимости (git-теги в `[tool.uv.sources]`)
 
-- `intelbit-bitrix24-client` (тег `v0.1.0`) — REST-клиент Bitrix24.
-- `intelbit-floweon-sdk` (тег `v0.2.0`) — `floweon_sdk` (`ConnectorPlugin`, manifest).
+- `intelbit-bitrix24-client` (тег `v0.3.0`) — REST-клиент Bitrix24.
+- `intelbit-floweon-sdk` (тег `v0.3.1`) — `floweon_sdk` (`ConnectorPlugin`, manifest).
 
 ---
 
